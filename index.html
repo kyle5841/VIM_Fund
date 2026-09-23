@@ -1271,7 +1271,14 @@ async function adminAction(act, btn) {
     if (act === 'updateCompanies') { show('KIND에서 상장기업 목록을 받는 중…'); const j = await run('updateCompanies', {}, null, false, true); S.corp = null; show('✓ ' + j.result); }
     if (act === 'testKis') { show('연결 확인 중…'); const j = await run('testKis'); const r = j.result; show(`✓ 연결 성공\n보유 종목 ${r.holdings}개 · D+2 예수금 ${won(r.cash)} · 총평가 ${won(r.totalEval)}`); }
     if (act === 'syncNow') { show('동기화 중… (종목 수에 따라 수십 초 걸릴 수 있습니다)'); const j = await run('syncNow', {}, null, true, true); const r = j.result; show(`✓ 동기화 완료\n신규 체결 ${r.added}건 반영 · 시세 ${r.prices}종목 갱신 · D+2 예수금 ${won(r.cash)}`); }
-    if (act === 'reconcile') { show('계좌 잔고 조회 중…'); const j = await run('reconcile'); S.recon = j.rows; render(); }
+    if (act === 'reconcile') {
+      show('계좌 잔고 조회 중…');
+      const j = await run('reconcile');
+      S.recon = j.rows;
+      const diff = j.rows.filter(r => Math.abs(r.sheetQty - r.kisQty) >= 1e-6).length;
+      show(`✓ 잔고 대조 완료 — ${j.rows.length}종목 중 ${diff ? '차이 ' + diff + '종목' : '모두 일치'} (아래 "잔고 대조" 표 참고)`);
+      render();
+    }
     if (act === 'toggleAuto') { await run('setAutoSync', { on: !(S.info && S.info.autoSync) }, '자동 실행 설정을 변경했습니다.', false, true); }
     if (act === 'recordToday') { const j = await run('recordToday', {}, null, true, true); toast(j.result); }
     if (act === 'rebuildHistory') {
