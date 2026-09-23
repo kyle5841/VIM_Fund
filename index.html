@@ -259,7 +259,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:24px 0 40px}
   <div class="wrap">
     <a class="logo" href="#dashboard" aria-label="VIM — Various Investment Methods"></a>
     <div class="top-right">
-      <span class="chip" id="srcChip"><span class="dot"></span><span>불러오는 중</span></span>
+      <span class="chip" id="srcChip" hidden><span class="dot"></span><span>불러오는 중</span></span>
       <span class="asof num" id="asOf"></span>
       <span class="chip role" id="roleChip" hidden></span>
       <button class="btn sm" id="adminBtn">로그인</button>
@@ -676,9 +676,12 @@ async function load(silent) {
 
 function renderHeader() {
   const raw = S.raw;
+  // 데이터 연동 상태(한투·시트)와 동기화 시각은 관리자에게만 표시 (데모 모드는 안내용으로 항상 표시)
+  const showSrc = isDemo() || isAdmin();
   const src = isDemo() ? '데모 데이터' : S.stale ? '최신 정보 확인 중…' : raw.source === 'kis' ? '한국투자증권 연동' : '스프레드시트 연동';
+  $('#srcChip').hidden = !showSrc;
   $('#srcChip').innerHTML = `<span class="dot"></span><span>${esc(src)}</span>`;
-  $('#asOf').textContent = '기준 ' + kstTime(raw.asOf) + (raw.lastSync ? ' · 동기화 ' + kstTime(raw.lastSync) : '');
+  $('#asOf').textContent = '기준 ' + kstTime(raw.asOf) + (raw.lastSync && isAdmin() ? ' · 동기화 ' + kstTime(raw.lastSync) : '');
   $('#adminBtn').textContent = S.auth ? '로그아웃' : '로그인';
   const rc = $('#roleChip');
   rc.hidden = !S.auth;
@@ -1574,6 +1577,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
 (function init() {
   try { const a = JSON.parse(store.get('vim_auth') || 'null'); if (a && a.token && ROLE_RANK[a.role]) S.auth = a; } catch (_) {}
   S.tab = validTab(location.hash.replace('#', ''));
+  $('#srcChip').hidden = !(isDemo() || isAdmin()); // 불러오는 중 표시도 관리자(또는 데모)만
   load();
   if (!isDemo()) setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) load(true); }, CONFIG.REFRESH_SEC * 1000);
 })();
