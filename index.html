@@ -43,6 +43,7 @@
   --shadow:none;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--text);font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -166,6 +167,15 @@ tfoot td{font-weight:700;background:var(--surface-2);border-bottom:0}
 .badge.sector{background:var(--brand-soft);color:var(--brand-ink);font-weight:600}
 .badge.kis{background:var(--grid);color:var(--text-2);font-weight:600}
 .badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.meet{background:var(--brand-soft);color:var(--brand-ink);box-shadow:inset 0 0 0 1px var(--brand-line)}
+.meet-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:20px 0 8px;font-weight:700}
+.meet-head .sub{font-size:12px;color:var(--muted);font-weight:500}
+.check{flex-direction:row!important;align-items:center;gap:8px!important;font-size:13px!important;color:var(--text)!important}
+.roles{display:flex;flex-direction:column;gap:10px;font-size:13px}
+.roles .r{display:grid;grid-template-columns:64px 1fr;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--grid)}
+.roles .r:last-child{border:0;padding-bottom:0}
+.roles b{font-weight:700}
+.top .chip.role{background:rgba(0,0,0,.18)}
 td.reason{white-space:normal;min-width:240px;max-width:420px;color:var(--text-2);font-size:12.5px}
 td.reason .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;white-space:pre-line}
 td.reason .clamp.open{-webkit-line-clamp:unset}
@@ -246,7 +256,8 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:24px 0 40px}
     <div class="top-right">
       <span class="chip" id="srcChip"><span class="dot"></span><span>불러오는 중</span></span>
       <span class="asof num" id="asOf"></span>
-      <button class="btn sm" id="adminBtn">관리자</button>
+      <span class="chip role" id="roleChip" hidden></span>
+      <button class="btn sm" id="adminBtn">로그인</button>
     </div>
   </div>
 </header>
@@ -262,24 +273,32 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:24px 0 40px}
  * API_URL : Apps Script 웹 앱 URL (https://script.google.com/macros/s/…/exec)
  *           비워두면 스프레드시트 스냅샷(데모 데이터)으로 동작합니다.            */
 const CONFIG = {
-  API_URL: '',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwwSveV3fmpthgoMMvnq0QnFvPWUquapkvWrHjPbsnLb3Qdk8_mec6Vtg_RD09kkYfB/exec',
   REFRESH_SEC: 120,
 };
 
 const DEMO = {"asOf":"2026-09-23T15:40:00+09:00","source":"demo","lastSync":null,"cash":null,"config":{"fundName":"VIM Fund","seed":100000000,"rf":0.0025,"days":252,"cashMode":"calc"},"trades":[["2026-08-31","005930","삼성전자",246500.0,44.0,"반도체","",2,""],["2026-08-31","000660","SK하이닉스",1582000.0,5.0,"반도체","",3,""],["2026-08-31","000990","DB하이텍",89800.0,34.0,"반도체","",4,""],["2026-08-31","108320","LX세미콘",36000.0,70.0,"반도체","",5,""],["2026-08-31","042700","한미반도체",207500.0,22.0,"소부장","",6,""],["2026-08-31","010950","S-Oil",150700.0,26.0,"에너지","",7,""],["2026-08-31","096770","SK이노베이션",121100.0,30.0,"에너지","",8,""],["2026-08-31","078930","GS",130000.0,21.0,"에너지","",9,""],["2026-08-31","009830","한화솔루션",33200.0,70.0,"에너지","",10,""],["2026-08-31","034020","두산에너빌리티",84300.0,40.0,"에너지","",11,""],["2026-08-31","015760","한국전력공사",31800.0,40.0,"에너지","",12,""],["2026-08-31","090430","아모레퍼시픽",151100.0,26.0,"화장품","",13,""],["2026-08-31","192820","코스맥스",301000.0,10.0,"화장품","",14,""],["2026-08-31","051900","LG생활건강",320000.0,9.0,"화장품","",15,""],["2026-08-31","161890","한국콜마",163300.0,15.0,"화장품","",16,""],["2026-08-31","207940","삼성바이오로직스",1460000.0,3.0,"바이오","",17,""],["2026-08-31","128940","한미약품",481000.0,10.0,"바이오","",18,""],["2026-08-31","006800","미래에셋증권",34800.0,70.0,"금융","",19,""],["2026-08-31","016360","삼성증권",87000.0,30.0,"금융","",20,""],["2026-08-31","005490","POSCO홀딩스",337000.0,9.0,"원자재","",21,""],["2026-08-31","103140","풍산",83800.0,25.0,"원자재","",22,""],["2026-08-31","007660","이수페타시스",109800.0,30.0,"소부장","",23,""],["2026-08-31","240810","원익IPS",108300.0,50.0,"소부장","",24,""],["2026-08-31","058470","리노공업",65300.0,80.0,"소부장","",25,""],["2026-08-31","009830","한화솔루션",33500.0,-70.0,"에너지","에너지 비중 축소를 위한 매도",26,""],["2026-09-01","015760","한국전력공사",32050.0,-40.0,"에너지","에너지 비중 축소를 위한 매도",27,""],["2026-09-01","010950","S-Oil",153200.0,-26.0,"에너지","에너지 비중 축소를 위한 매도",28,""],["2026-09-02","042700","한미반도체",213500.0,-22.0,"소부장","",29,""],["2026-09-02","161890","한국콜마",155000.0,25.0,"화장품","",30,""],["2026-09-02","009830","한화솔루션",30350.0,200.0,"에너지","",31,""],["2026-09-03","051900","LG생활건강",297500.0,-9.0,"화장품","수익률 -8% 인한 조정 매도",32,""],["2026-09-03","078930","GS",118000.0,-21.0,"에너지","수익률 -9%로 인한 매도",33,""],["2026-09-03","034020","두산에너빌리티",80800.0,70.0,"에너지","SMR 기업 테라가 미국 12개 기업과 계약으로 수주가 넓어질 것이라 예상\n러시아 측에서 SMR로 시장진출로 수주를 할 것이라 예상해서 추가 매수",34,""],["2026-09-07","000880","한화",137800.0,10.0,"에너지","급등주를 잡아라 (이의성)",35,""],["2026-09-07","005380","현대차",390000.0,5.0,"소부장","급등주를 잡아라 (연승진)",36,""],["2026-09-07","032640","LG유플러스",14880.0,100.0,"소부장","급등주를 잡아라 (현준용)",37,""],["2026-09-07","090360","로보스타",82700.0,20.0,"소부장","급등주를 잡아라 (안재민)",38,""],["2026-09-07","024060","흥구석유",11030.0,130.0,"에너지","급등주를 잡아라 (김인)",39,""],["2026-09-07","041190","우리기술투자",6120.0,250.0,"소부장","급등주를 잡아라 (한병호)",40,""],["2026-09-07","000990","DB하이텍",102100.0,-34.0,"반도체","수익률 +10%로 정량 매도",41,""],["2026-09-07","095340","ISC",189000.0,20.0,"소부장","반도체 회복 국면 탑승 위해 매수(일봉 기준 일목균형표 구름대 돌파 & 주봉 기준 이동평균선 20일 선 돌파)\n20일선 182300까지 내려오면 1차 손절, 이후 주봉 기준 구름대 하향 돌파 시 전량 손절",42,""],["2026-09-07","192820","코스맥스",269000.0,-10.0,"화장품","수익률 -9%로 전량 매도",43,""],["2026-09-07","103140","풍산",78200.0,-25.0,"원자재","수익률 -8%로 전량 매도",44,""],["2026-09-07","009830","한화솔루션",30000.0,-150.0,"에너지","에너지 섹터 비중 축소 및 손절 위해서 매도(주봉 기준 일목균형표 구름대 하향 돌파 & 이동평균선 20일선 하향 돌파)",45,""],["2026-09-08","000660","SK하이닉스",1829000.0,-5.0,"반도체","수익률 +15%이상으로 전량 매도 및 이동평균선 하향 돌파",46,""],["2026-09-08","096770","SK이노베이션",138600.0,5.0,"에너지","에너지 섹터 상향으로 인한 추가 매수",47,""],["2026-09-08","096770","SK이노베이션",139200.0,25.0,"에너지","",48,""],["2026-09-09","192820","코스맥스",264000.0,25.0,"화장품","",49,""],["2026-09-09","034020","두산에너빌리티",94100.0,-50.0,"에너지","수익률 +15% 이상으로 일부 매도 및 \n에너지 상승 국면으로 수혜 있을 것이라 판단(대부분 스페이스X와 협업체계 과정)",50,""],["2026-09-09","082920","비츠로셀",29550.0,210.0,"에너지","에너지 상승 국면으로 매수",51,""],["2026-09-09","161890","한국콜마",139300.0,20.0,"화장품","",52,""],["2026-09-09","096770","SK이노베이션",148500.0,-30.0,"에너지","에너지 상승 국면으로 +14% 수익률 달성해서 매도",53,""],["2026-09-09","161890","한국콜마",139700.0,-20.0,"화장품","수익률 -11%로 매도",54,""],["2026-09-10","024060","흥구석유",14880.0,-130.0,"에너지","수익률+33%로 매도",55,""],["2026-09-10","006400","삼성SDI",565000.0,14.0,"소부장","로봇, 유틸리티 부분이 상승 국면으로 보여 신규 매수",56,""],["2026-09-10","096770","SK이노베이션",158200.0,-30.0,"에너지","수익률 +22%로 매도",57,""],["2026-09-10","005930","삼성전자",266000.0,30.0,"반도체","추가매수",58,""],["2026-09-10","240810","원익IPS",127400.0,-50.0,"소부장","수익률 +17%로 매도",59,""],["2026-09-10","090430","아모레퍼시픽",137100.0,-26.0,"화장품","수익률 -9%로 전량 매도 (신규 국가×신규 오프라인 채널×신규 브랜드’의 동시 확대)",60,""],["2026-09-11","000660","SK하이닉스",1788000.0,6.0,"반도체","반도체 하락 국면으로 추가 신규 매수",61,""],["2026-09-11","041190","우리기술투자",5560.0,-250.0,"소부장","수익률 -9%로 전량매도",62,""],["2026-09-14","090360","로보스타",74700.0,-20.0,"소부장","현금 비중을 늘리기 위해 매도",63,""],["2026-09-14","192820","코스맥스",280000.0,30.0,"화장품","화장품 강세로 매수",64,""],["2026-09-14","192820","코스맥스",274500.0,-30.0,"화장품","화장품 비중 축소시키기 위해 매도",65,""],["2026-09-14","000880","한화",141200.0,-10.0,"방산","",66,""],["2026-09-14","000880","한화",141200.0,50.0,"방산","방산 섹터에 외국인 순매수, 기관 매수 비중이 증가해서 매수",67,""],["2026-09-14","032640","LG유플러스",14850.0,-100.0,"소부장","",68,""],["2026-09-15","009830","한화솔루션",28200.0,-50.0,"에너지","에너지 섹터 축소로 손실 -7%로 매도",69,""],["2026-09-15","095340","ISC",176700.0,-10.0,"소부장","17600원대로 하락하여 부분 매도",70,""],["2026-09-15","042510","라온시큐어",11640.0,300.0,"반도체","보안과 관련된 주로 매수",71,""],["2026-09-15","042510","라온시큐어",13800.0,-300.0,"반도체","수익률 +10%로 매도",72,""],["2026-09-15","263860","지니언스",20000.0,-250.0,"반도체","",73,""],["2026-09-16","006800","미래에셋증권",31600.0,-70.0,"금융","수익률-7%로 금리 인상으로 인한 자금 부족으로 인한 섹터 축소",74,""],["2026-09-16","005380","현대차",362000.0,-5.0,"소부장","수익률 -7%로 전량매도",75,""],["2026-09-18","128940","한미약품",508000.0,-10.0,"바이오","바이오 섹터의 축소로 인해 수익률 +5%에서 매도",76,""],["2026-09-18","005940","NH투자증권",25950.0,190.0,"금융","약 1,500억 원에 달하는 대주주의 장내 매수로 주주환원에 비중을 높여서 매수",77,""],["2026-09-18","005930","삼성전자",260000.0,-30.0,"반도체","반도체 비중이 30%초과로 현금 확보를 위해 부분 매도",78,""],["2026-09-21","006280","녹십자",122200.0,30.0,"바이오","",79,""],["2026-09-21","031980","피에스케이홀딩스",159900.0,30.0,"소부장","",80,""],["2026-09-21","005830","DB손해보험",188000.0,20.0,"금융","",81,""],["2026-09-21","000810","삼성화재",653000.0,5.0,"금융","",82,""],["2026-09-21","000880","한화",128900.0,-29.0,"에너지","에너지 비중 리벨런싱 및 수익률 -7% 저조한 성적으로 인해 매도",83,""],["2026-09-22","058470","리노공업",73000.0,-80.0,"소부장","수익률 +10%로 인해 매도",84,""],["2026-09-22","095340","ISC",208000.0,-10.0,"소부장","수익률 +10%로 인해 매도",85,""],["2026-09-22","016360","삼성증권",90300.0,-30.0,"금융","수익률 +3%로 증권 비중 조절을 위한 매도",86,""],["2026-09-23","005930","삼성전자",285000.0,-20.0,"반도체","수익률+10% 절대수익 추구와 반도체 비중 축소로 매도",87,""],["2026-09-23","009150","삼성전기",1515000.0,4.0,"소부장","AI데이터센터로 인한 수혜가 있을 것이라 판단하여 신규 매수",88,""]],"targets":[["반도체",0.25],["소부장",0.15],["에너지",0.15],["화장품",0.15],["바이오",0.15],["금융",0.05],["원자재",0.05],["현금",0.05],["방산",null]],"prices":{"000660":[1848000.0,"gf"],"000810":[648000.0,"gf"],"000880":[130200.0,"gf"],"000990":[130900.0,"gf"],"005380":[353250.0,"gf"],"005490":[310500.0,"gf"],"005830":[184600.0,"gf"],"005930":[284000.0,"gf"],"005940":[26100.0,"gf"],"006280":[123500.0,"gf"],"006400":[518000.0,"gf"],"006800":[32250.0,"gf"],"007660":[118400.0,"gf"],"009150":[1496000.0,"gf"],"009830":[29350.0,"gf"],"010950":[157600.0,"gf"],"015760":[30200.0,"gf"],"016360":[91600.0,"gf"],"024060":[12400.0,"gf"],"031980":[161500.0,"gf"],"032640":[14620.0,"gf"],"034020":[81200.0,"gf"],"041190":[6070.0,"gf"],"042510":[10950.0,"gf"],"042700":[242000.0,"gf"],"051900":[294500.0,"gf"],"058470":[74300.0,"gf"],"078930":[111200.0,"gf"],"082920":[27700.0,"gf"],"090360":[78300.0,"gf"],"090430":[142900.0,"gf"],"095340":[211000.0,"gf"],"096770":[149900.0,"gf"],"103140":[77000.0,"gf"],"108320":[36600.0,"gf"],"128940":[520000.0,"gf"],"161890":[149500.0,"gf"],"192820":[273500.0,"gf"],"207940":[1365000.0,"gf"],"240810":[132700.0,"gf"],"263860":[18350.0,"gf"]},"market":[{"name":"KOSPI","price":7054.65,"change":36.74,"pct":0.52},{"name":"S&P500","price":7764.64,"change":-0.06,"pct":0.0},{"name":"NASDAQ","price":27244.28,"change":122.18,"pct":0.45},{"name":"DOW","price":51863.69,"change":-185.14,"pct":-0.36},{"name":"USD/KRW","price":1352.04,"change":-23.22,"pct":-1.69}],"history":[["2026-08-28",6788.88,100000000],["2026-08-31",6820.02,102012900],["2026-09-01",6835.8,101883800],["2026-09-02",6562.72,99347800],["2026-09-03",6579.48,98360600],["2026-09-04",6687.21,99890100],["2026-09-07",6995.39,102671400],["2026-09-08",6954.52,102324400],["2026-09-09",7051.64,104402200],["2026-09-10",7033.92,104801700],["2026-09-11",6909.91,103291200],["2026-09-14",6684.37,100352200],["2026-09-15",6627.26,101797200],["2026-09-16",6717.97,102707200],["2026-09-17",6715.41,103505700],["2026-09-18",6894.23,103621200],["2026-09-21",7007.72,105342500],["2026-09-22",7017.91,104850900]]};
 
 /* ===================== 상태 ===================== */
+/* 접근 권한: 방문자(로그인 없음) < 부원(부원 비밀번호) < 관리자(관리자 비밀번호)
+ * 매매기록·실현손익 데이터는 서버가 부원 이상에게만 보냅니다 (화면에서 숨기는 것만이 아님). */
 const TABS = [
-  ['dashboard', '대시보드'], ['holdings', '보유종목'], ['sectors', '섹터 현황'],
-  ['trades', '매매기록'], ['realized', '실현손익'], ['risk', '위험 지표'],
+  ['dashboard', '대시보드', 'visitor'], ['holdings', '보유종목', 'visitor'], ['sectors', '섹터 현황', 'visitor'],
+  ['trades', '매매기록', 'member'], ['realized', '실현손익', 'member'], ['risk', '위험 지표', 'visitor'],
+  ['admin', '관리자', 'admin'],
 ];
+const ROLE_RANK = { visitor: 0, member: 1, admin: 2 };
+const ROLE_NAME = { visitor: '방문자', member: '부원', admin: '관리자' };
 const S = {
-  raw: null, m: null, tab: 'dashboard', charts: {}, admin: null, info: null, recon: null, corp: null,
+  raw: null, m: null, tab: 'dashboard', charts: {}, auth: null, info: null, recon: null, corp: null, demoFull: null,
   hold: { sector: 'all', sort: 'value', dir: -1 },
-  tr: { q: '', side: 'all', sector: 'all', missing: false, limit: 60 },
+  tr: { q: '', side: 'all', sector: 'all', missing: false, meeting: false, limit: 60 },
   rl: { sort: 'date', dir: -1 },
 };
 const isDemo = () => !CONFIG.API_URL;
+const role = () => (S.auth && S.auth.role) || 'visitor';
+const can = need => ROLE_RANK[role()] >= ROLE_RANK[need];
+const isAdmin = () => role() === 'admin';
 
 /* ===================== 유틸 ===================== */
 const $ = (s, el = document) => el.querySelector(s);
@@ -332,11 +351,11 @@ async function apiPost(action, payload = {}) {
   const r = await fetch(CONFIG.API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ action, token: S.admin && S.admin.token }, payload)),
+    body: JSON.stringify(Object.assign({ action, token: S.auth && S.auth.token }, payload)),
   });
   const j = await r.json();
   if (!j.ok) {
-    if (j.error === 'AUTH') { setAdmin(null); throw new Error('세션이 만료되었습니다. 다시 로그인하세요.'); }
+    if (j.error === 'AUTH') { setAuth(null, false); throw new Error('로그인이 만료되었습니다. 다시 로그인하세요.'); }
     throw new Error(j.error || '요청 실패');
   }
   return j;
@@ -344,24 +363,26 @@ async function apiPost(action, payload = {}) {
 
 /* 데모 모드: 변경사항은 이 브라우저 메모리에만 반영 */
 function demoPost(action, p) {
-  const raw = S.raw;
+  const raw = S.demoFull;
   const kisOnly = () => { throw new Error('데모 모드입니다. Apps Script를 배포하고 CONFIG.API_URL을 설정하면 사용할 수 있습니다.'); };
+  if (!['login', 'logout'].includes(action) && !isAdmin()) throw new Error('관리자만 사용할 수 있는 기능입니다.'); // 서버와 같은 권한 규칙
+  const findRow = row => { const i = raw.trades.findIndex(x => x[7] === row); if (i < 0) throw new Error('행을 찾을 수 없습니다.'); return i; };
   switch (action) {
-    case 'login': return { ok: true, token: 'demo' };
-    case 'info': return { ok: true, info: { kis: { enabled: false }, autoSync: false, dailyRecord: false, lastSync: null, log: [] } };
+    case 'login': return { ok: true, role: p.role === 'admin' ? 'admin' : 'member', token: 'demo-' + p.role };
+    case 'info': return { ok: true, info: { kis: { enabled: false }, autoSync: false, dailyRecord: false, weeklyBackup: false, lastSync: null, sheetLock: null, backups: [], log: [] } };
     case 'addTrade': {
       const t = normTradeInput(p.trade);
       const row = Math.max(1, ...raw.trades.map(x => x[7])) + 1;
-      raw.trades.push([t.date, t.code, t.name, t.price, t.qty, t.sector, t.reason, row, '']);
+      raw.trades.push([t.date, t.code, t.name, t.price, t.qty, t.sector, t.reason, row, 'WEB', t.meeting || '']);
       return { ok: true };
     }
     case 'updateTrade': {
-      const i = raw.trades.findIndex(x => x[7] === p.row);
-      if (i < 0) throw new Error('행을 찾을 수 없습니다.');
+      const i = findRow(p.row);
       const t = normTradeInput(p.trade);
-      raw.trades[i] = [t.date, t.code, t.name, t.price, t.qty, t.sector, t.reason, p.row, raw.trades[i][8]];
+      raw.trades[i] = [t.date, t.code, t.name, t.price, t.qty, t.sector, t.reason, p.row, raw.trades[i][8], t.meeting !== undefined ? t.meeting : (raw.trades[i][9] || '')];
       return { ok: true };
     }
+    case 'setMeeting': raw.trades[findRow(p.row)][9] = p.meeting || ''; return { ok: true };
     case 'deleteTrade': raw.trades = raw.trades.filter(x => x[7] !== p.row); return { ok: true };
     case 'saveTargets': raw.targets = p.targets; return { ok: true };
     case 'saveConfig': Object.assign(raw.config, p.config); return { ok: true };
@@ -383,16 +404,16 @@ function normTradeInput(t) {
  *  - 매수: 평균단가 = (기존수량×기존단가 + 매수수량×매수단가) / 새 수량
  *  - 매도: 평균단가 유지, 실현손익 = 매도수량 × (매도가 − 평균단가)
  *  - 보유수량을 초과한 매도는 손익에서 제외하고 경고로 표시                         */
-function compute(raw) {
-  const cfg = raw.config;
-  const seed = cfg.seed;
-  const warnings = [];
-  const trades = raw.trades.map(t => ({
+function parseTrades(rows) {
+  return (rows || []).map(t => ({
     date: t[0], code: String(t[1] || ''), name: t[2], price: +t[3], qty: +t[4],
-    sector: t[5] || '미분류', reason: t[6] || '', row: t[7], src: t[8] || '',
+    sector: t[5] || '미분류', reason: t[6] || '', row: t[7], src: t[8] || '', meeting: t[9] || '',
   })).filter(t => t.name);
-  const sorted = [...trades].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row);
+}
+const sortTrades = trades => [...trades].sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : a.row - b.row);
 
+/** 매매기록 → 종목별 포지션(수량·평균단가)과 실현손익 */
+function runLedger(sorted, warnings) {
   const pos = {};
   const realized = [];
   for (const t of sorted) {
@@ -414,6 +435,34 @@ function compute(raw) {
       if (p.qty <= 0) { p.qty = 0; p.avg = 0; }
     }
   }
+  return { pos, realized };
+}
+
+/** 방문자용 데이터 = 서버의 buildPublic_과 같은 형태 (데모 모드에서 사용) */
+function toPublic(full) {
+  const { pos, realized } = runLedger(sortTrades(parseTrades(full.trades)), []);
+  const held = Object.values(pos).filter(p => p.qty > 0);
+  const out = JSON.parse(JSON.stringify(full));
+  delete out.trades;
+  out.positions = held.map(p => [p.code, p.name, p.sector, p.qty, p.avg]);
+  if (!ok(out.cash)) out.cash = full.config.seed - held.reduce((s, p) => s + p.qty * p.avg, 0) + realized.reduce((s, r) => s + r.pnl, 0);
+  out.access = 'public';
+  return out;
+}
+
+function compute(raw) {
+  const cfg = raw.config;
+  const seed = cfg.seed;
+  const warnings = [];
+  const full = Array.isArray(raw.trades); // 부원 이상: 매매기록 포함
+  let trades = [], sorted = [], realized = [], pos = {};
+  if (full) {
+    trades = parseTrades(raw.trades);
+    sorted = sortTrades(trades);
+    ({ pos, realized } = runLedger(sorted, warnings));
+  } else {
+    (raw.positions || []).forEach(p => { pos[p[0]] = { code: p[0], name: p[1], sector: p[2] || '미분류', qty: +p[3], avg: +p[4] }; });
+  }
 
   const prices = raw.prices || {};
   const holdings = Object.values(pos).filter(p => p.qty > 0).map(p => {
@@ -434,7 +483,7 @@ function compute(raw) {
   const wins = realized.filter(r => r.pnl > 0), losses = realized.filter(r => r.pnl < 0);
   const fund = {
     seed, cost, eval: evalSum, cash, aum, nav: aum / seed * 1000, cumRet: aum / seed - 1,
-    unreal: evalSum - cost, unrealPct: cost ? evalSum / cost - 1 : 0, realized: realizedSum,
+    unreal: evalSum - cost, unrealPct: cost ? evalSum / cost - 1 : 0, realized: full ? realizedSum : null,
     wins: wins.length, losses: losses.length,
     winRate: wins.length + losses.length ? wins.length / (wins.length + losses.length) : null,
     avgWin: wins.length ? mean(wins.map(r => r.pnl)) : null,
@@ -461,7 +510,7 @@ function compute(raw) {
   if (holdings.some(h => h.sector === '미분류')) warnings.push({ k: '섹터 미분류', m: `섹터가 '미분류'인 보유종목이 있습니다: ${holdings.filter(h => h.sector === '미분류').map(h => h.name).join(', ')}` });
 
   const hist = buildHistory(raw, fund, cfg, warnings);
-  return { cfg, trades, sorted, holdings, realized, fund, sectors, hist, warnings };
+  return { cfg, full, trades, sorted, holdings, realized, fund, sectors, hist, warnings };
 }
 
 function buildHistory(raw, fund, cfg, warnings) {
@@ -519,8 +568,22 @@ function buildHistory(raw, fund, cfg, warnings) {
 /* ===================== 로딩 ===================== */
 async function load(silent) {
   try {
-    const raw = isDemo() ? (S.raw || JSON.parse(JSON.stringify(DEMO))) : await apiGet('public');
+    let raw;
+    if (isDemo()) {
+      if (!S.demoFull) S.demoFull = JSON.parse(JSON.stringify(DEMO));
+      raw = can('member') ? JSON.parse(JSON.stringify(S.demoFull)) : toPublic(S.demoFull);
+    } else if (can('member')) {
+      try { raw = (await apiPost('data')).data; }
+      catch (e) {
+        if (S.auth) throw e;
+        raw = await apiGet('public'); // 로그인 만료 → 방문자 화면으로
+        toast('로그인이 만료되어 방문자 화면으로 전환했습니다.', true);
+      }
+    } else {
+      raw = await apiGet('public');
+    }
     S.raw = raw;
+    S.tab = validTab(S.tab);
     S.m = compute(raw);
     renderHeader();
     render();
@@ -529,19 +592,20 @@ async function load(silent) {
     else toast('새로고침 실패: ' + e.message, true);
   }
 }
-function recompute() { S.m = compute(S.raw); render(); }
 
 function renderHeader() {
   const raw = S.raw;
   const src = isDemo() ? '데모 데이터' : raw.source === 'kis' ? '한국투자증권 연동' : '스프레드시트 연동';
   $('#srcChip').innerHTML = `<span class="dot"></span><span>${esc(src)}</span>`;
   $('#asOf').textContent = '기준 ' + kstTime(raw.asOf) + (raw.lastSync ? ' · 동기화 ' + kstTime(raw.lastSync) : '');
-  $('#adminBtn').textContent = S.admin ? '로그아웃' : '관리자';
-  const tabs = TABS.concat(S.admin ? [['admin', '관리자']] : []);
-  $('#tabs').innerHTML = tabs.map(([k, l]) => `<button class="tab ${k === 'admin' ? 'admin-tab' : ''} ${S.tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('');
+  $('#adminBtn').textContent = S.auth ? '로그아웃' : '로그인';
+  const rc = $('#roleChip');
+  rc.hidden = !S.auth;
+  rc.textContent = ROLE_NAME[role()];
+  $('#tabs').innerHTML = TABS.filter(t => can(t[2])).map(([k, l]) => `<button class="tab ${k === 'admin' ? 'admin-tab' : ''} ${S.tab === k ? 'on' : ''}" data-tab="${k}">${l}</button>`).join('');
 }
 
-function validTab(h) { return TABS.some(t => t[0] === h) || (h === 'admin' && S.admin) ? h : 'dashboard'; }
+function validTab(h) { const t = TABS.find(x => x[0] === h); return t && can(t[2]) ? h : 'dashboard'; }
 function go(tab, keepScroll) {
   S.tab = validTab(tab);
   try { if (location.hash !== '#' + S.tab) history.pushState(null, '', '#' + S.tab); } catch (_) {}
@@ -641,6 +705,16 @@ function viewDashboard() {
   const byW = [...holdings].sort((a, b) => b.weight - a.weight);
   const list = (arr, val) => arr.length ? `<ul class="rank">${arr.map((h, i) => `<li><span class="nm"><span class="i">${i + 1}</span>${esc(h.name)}</span>${val(h)}</li>`).join('')}</ul>` : '<div class="empty">보유 종목 없음</div>';
   const recent = [...S.m.sorted].reverse().slice(0, 5);
+  const hs = hist.stats;
+  const exc = hs ? hs.fund.period - hs.kospi.period : NaN;
+  const pp = x => ok(x) ? (x > 0 ? '+' : '') + (x * 100).toFixed(2) + '%p' : '–';
+  const kpiTail = S.m.full ? `
+      ${kpi('실현손익', `<span class="${cls(f.realized)}">${signed(f.realized)}</span>`, `${f.wins + f.losses}건 매도`)}
+      ${kpi('승률', f.winRate != null ? pct(f.winRate, 1, false) : '–', `${f.wins}승 ${f.losses}패`)}
+      ${kpi('손익비', f.pf != null ? f.pf.toFixed(2) : '–', '평균이익 ÷ 평균손실')}` : `
+      ${kpi('KOSPI 대비', `<span class="${cls(exc)}">${pp(exc)}</span>`, hs ? `펀드 ${pct(hs.fund.period)} · KOSPI ${pct(hs.kospi.period)}` : '')}
+      ${kpi('최대 낙폭', hs ? `<span class="${cls(hs.fund.mdd)}">${pct(hs.fund.mdd)}</span>` : '–', '전고점 대비 (MDD)')}
+      ${kpi('보유 종목', holdings.length + '개', new Set(holdings.map(h => h.sector)).size + '개 섹터')}`;
   return `
   <div class="market">${mk}</div>
   <div class="hero">
@@ -656,12 +730,10 @@ function viewDashboard() {
     <div class="kpis">
       ${kpi('투자원가', won(f.cost), '보유종목 매입금액 합계')}
       ${kpi('평가금액', won(f.eval), `${holdings.length}개 종목`)}
-      ${kpi('보유현금', won(f.cash), S.raw.cash != null ? '증권계좌 D+2 예수금' : '설정액 − 투자원가 + 실현손익')}
+      ${kpi('보유현금', won(f.cash), S.raw.source === 'kis' && S.m.cfg.cashMode === 'kis' ? '증권계좌 D+2 예수금' : '장부 기준 (설정액 − 투자원가 + 실현손익)')}
       ${kpi('현금비중', pct(f.cash / f.aum, 1, false), 'AUM 대비')}
       ${kpi('평가손익', `<span class="${cls(f.unreal)}">${signed(f.unreal)}</span>`, `<span class="${cls(f.unrealPct)}">${pct(f.unrealPct)}</span> 평가수익률`)}
-      ${kpi('실현손익', `<span class="${cls(f.realized)}">${signed(f.realized)}</span>`, `${f.wins + f.losses}건 매도`)}
-      ${kpi('승률', f.winRate != null ? pct(f.winRate, 1, false) : '–', `${f.wins}승 ${f.losses}패`)}
-      ${kpi('손익비', f.pf != null ? f.pf.toFixed(2) : '–', '평균이익 ÷ 평균손실')}
+      ${kpiTail}
     </div>
   </div>
   <div class="grid g-dash" style="margin-top:14px">
@@ -674,8 +746,8 @@ function viewDashboard() {
     <div class="card"><h3>수익률 하위 종목</h3>${list([...byRet].reverse().slice(0, 5), h => `<span class="v num ${cls(h.ret)}">${pct(h.ret)}</span>`)}</div>
     <div class="card"><h3>보유비중 상위 종목</h3>${list(byW.slice(0, 5), h => `<span class="v num">${pct(h.weight, 1, false)}</span>`)}</div>
   </div>
-  <div class="section-title"><h2>최근 매매</h2><a href="#trades" class="sub">전체 보기 →</a></div>
-  ${tradeTable(recent, false)}`;
+  ${S.m.full ? `<div class="section-title"><h2>최근 매매</h2><a href="#trades" class="sub">전체 보기 →</a></div>
+  ${tradeTable(recent, false)}` : `<p class="hint" style="margin-top:22px">매매기록과 실현손익은 부원 로그인 후 볼 수 있습니다.</p>`}`;
 }
 function kpi(l, v, s) { return `<div class="kpi"><div class="l">${l}</div><div class="v num">${v}</div><div class="s muted">${s || ''}</div></div>`; }
 function afterDashboard() { navChart('cNav'); }
@@ -762,20 +834,20 @@ function viewSectors() {
 
 /* ===================== 뷰: 매매기록 ===================== */
 function tradeTable(list, full) {
-  const admin = full && S.admin;
+  const admin = full && isAdmin();
   if (!list.length) return '<div class="card empty">해당하는 매매기록이 없습니다.</div>';
   return `<div class="tbl-wrap"><table>
     <thead><tr><th>거래일</th><th>구분</th><th>종목</th><th class="r">단가</th><th class="r">수량</th><th class="r">거래금액</th><th>섹터</th><th>매매근거 / 투자전략</th>${admin ? '<th></th>' : ''}</tr></thead>
     <tbody>${list.map(t => `<tr>
       <td class="num">${esc(t.date)}</td>
       <td><span class="badge ${t.qty > 0 ? 'buy' : 'sell'}">${t.qty > 0 ? '매수' : '매도'}</span></td>
-      <td><b>${esc(t.name)}</b><span class="code">${esc(t.code)}</span>${/^KIS/.test(t.src) ? ' <span class="badge kis" title="한국투자증권 체결 자동 반영">자동</span>' : ''}</td>
+      <td><b>${esc(t.name)}</b><span class="code">${esc(t.code)}</span>${/^KIS/.test(t.src) ? ' <span class="badge kis" title="한국투자증권 체결 자동 반영">자동</span>' : ''}${t.meeting ? ` <span class="badge meet" title="주간 회의에서 결정된 매매">📌 ${esc(md(t.meeting))} 회의</span>` : ''}</td>
       <td class="r num">${int(t.price)}</td>
       <td class="r num">${qtyf(Math.abs(t.qty))}</td>
       <td class="r num">${int(Math.abs(t.qty) * t.price)}</td>
       <td><span class="badge sector">${esc(t.sector)}</span></td>
       <td class="reason">${t.reason ? `<div class="clamp" data-clamp>${esc(t.reason)}</div>` : '<span class="none">—</span>'}</td>
-      ${admin ? `<td><button class="btn sm" data-edit="${t.row}">수정</button> <button class="btn sm danger" data-del="${t.row}">삭제</button></td>` : ''}
+      ${admin ? `<td><button class="btn sm" data-meet="${t.row}" title="주간 회의 결정 표시">📌${t.meeting ? ' ✓' : ''}</button> <button class="btn sm" data-edit="${t.row}">수정</button> <button class="btn sm danger" data-del="${t.row}">삭제</button></td>` : ''}
     </tr>`).join('')}</tbody></table></div>`;
 }
 function viewTrades() {
@@ -787,22 +859,40 @@ function viewTrades() {
     (st.side === 'all' || (st.side === 'buy' ? t.qty > 0 : t.qty < 0)) &&
     (st.sector === 'all' || t.sector === st.sector) &&
     (!st.missing || !t.reason) &&
+    (!st.meeting || t.meeting) &&
     (!q || t.name.toLowerCase().includes(q) || t.code.includes(q) || t.reason.toLowerCase().includes(q)));
   const buys = all.filter(t => t.qty > 0), sells = all.filter(t => t.qty < 0);
   const missing = all.filter(t => !t.reason).length;
+  const meetCount = all.filter(t => t.meeting).length;
   return `
   <div class="section-title" style="margin-top:0"><h2>매매기록</h2><span class="sub">총 ${all.length}건 · 매수 ${buys.length} · 매도 ${sells.length}</span></div>
   <div class="toolbar">
-    <input class="input grow" id="trQ" placeholder="종목명·코드·매매근거 검색" value="${esc(st.q)}" style="max-width:320px">
+    <input class="input grow" id="trQ" placeholder="종목명·코드·매매근거 검색" value="${esc(st.q)}" style="max-width:320px;min-width:200px">
     <div class="seg">${[['all', '전체'], ['buy', '매수'], ['sell', '매도']].map(([k, l]) => `<button class="${st.side === k ? 'on' : ''}" data-side="${k}">${l}</button>`).join('')}</div>
     <select class="input" id="trSec"><option value="all">모든 섹터</option>${secs.map(s => `<option ${st.sector === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select>
-    ${S.admin ? `<label class="pill ${st.missing ? 'on' : ''}" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="trMiss" ${st.missing ? 'checked' : ''} style="display:none">근거 미입력 ${missing}건</label>` : ''}
+    <button class="pill ${st.meeting ? 'on' : ''}" data-meetf>📌 주간회의 결정 ${meetCount}건</button>
+    ${isAdmin() ? `<label class="pill ${st.missing ? 'on' : ''}" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="trMiss" ${st.missing ? 'checked' : ''} style="display:none">근거 미입력 ${missing}건</label>` : ''}
     <span class="grow"></span>
-    ${S.admin ? '<button class="btn primary" id="addTrade">+ 매매 입력</button>' : ''}
+    ${isAdmin() ? '<button class="btn primary" id="addTrade">+ 매매 입력</button>' : ''}
   </div>
-  ${tradeTable(list.slice(0, st.limit), true)}
-  ${list.length > st.limit ? `<div style="text-align:center;margin-top:12px"><button class="btn" id="more">더 보기 (${list.length - st.limit}건)</button></div>` : ''}
-  <p class="hint">매수는 수량 양수, 매도는 수량 음수로 시트에 기록됩니다. 매매근거를 누르면 전체 내용을 볼 수 있습니다.</p>`;
+  ${st.meeting ? meetingGroups(list) : `${tradeTable(list.slice(0, st.limit), true)}
+  ${list.length > st.limit ? `<div style="text-align:center;margin-top:12px"><button class="btn" id="more">더 보기 (${list.length - st.limit}건)</button></div>` : ''}`}
+  <p class="hint">매수는 수량 양수, 매도는 수량 음수로 시트에 기록됩니다. 매매근거를 누르면 전체 내용을 볼 수 있습니다. 📌 표시는 주간 회의에서 결정된 매매입니다${isAdmin() ? ' (각 행의 📌 버튼으로 표시·해제)' : ''}.</p>`;
+}
+/** 주간회의 결정 매매만 회의일별로 묶어서 보기 */
+function meetingGroups(list) {
+  if (!list.length) return `<div class="card empty">주간 회의 결정으로 표시된 매매가 없습니다.${isAdmin() ? '<br>매매기록 각 행의 📌 버튼으로 표시할 수 있습니다.' : ''}</div>`;
+  const groups = new Map();
+  [...list].sort((a, b) => (a.meeting < b.meeting ? 1 : a.meeting > b.meeting ? -1 : 0)).forEach(t => {
+    if (!groups.has(t.meeting)) groups.set(t.meeting, []);
+    groups.get(t.meeting).push(t);
+  });
+  return [...groups.entries()].map(([d, items]) => {
+    const buys = items.filter(t => t.qty > 0), sells = items.filter(t => t.qty < 0);
+    const amt = arr => arr.reduce((s, t) => s + Math.abs(t.qty) * t.price, 0);
+    const part = (l, arr) => arr.length ? `${l} ${arr.length}건 ${eok(amt(arr))}원` : '';
+    return `<div class="meet-head"><span>📌 ${esc(d)} 주간회의</span><span class="sub">${[part('매수', buys), part('매도', sells)].filter(Boolean).join(' · ')}</span></div>${tradeTable(items, true)}`;
+  }).join('');
 }
 
 /* ===================== 뷰: 실현손익 ===================== */
@@ -914,7 +1004,7 @@ function afterRisk() {
 
 /* ===================== 뷰: 관리자 ===================== */
 function viewAdmin() {
-  if (!S.admin) return '<div class="card empty">관리자 로그인이 필요합니다.</div>';
+  if (!isAdmin()) return '<div class="card empty">관리자 로그인이 필요합니다.</div>';
   const i = S.info;
   const k = (i && i.kis) || {};
   const cfg = S.m.cfg;
@@ -924,25 +1014,24 @@ function viewAdmin() {
     <button class="btn primary" data-act="syncNow">지금 동기화</button>
     <button class="btn" data-act="reconcile">잔고 대조</button>`;
   return `
-  <div class="section-title" style="margin-top:0"><h2>관리자</h2><span class="sub">${isDemo() ? '데모 모드 — 변경사항은 새로고침하면 사라집니다' : '변경사항은 스프레드시트에 즉시 저장됩니다'}</span></div>
+  <div class="section-title" style="margin-top:0"><h2>관리자</h2><span class="sub">${isDemo() ? '데모 모드 — 변경사항은 새로고침하면 사라집니다' : '입력은 이 화면에서만 — 변경사항은 스프레드시트에 즉시 저장되고 변경 기록에 남습니다'}</span></div>
   <div class="grid g2">
     <div class="card"><h3>연동 상태</h3>
       <div class="status">
         <div class="line"><span>데이터 소스</span><span>${isDemo() ? '<span class="bad">API 미연결 (데모)</span>' : '<span class="ok">스프레드시트 연결됨</span>'}</span></div>
         <div class="line"><span>한국투자증권 계좌</span><span>${k.enabled ? `<span class="ok">연결됨</span> · ${k.env === 'mock' ? '모의투자' : '실전'} · ${esc(k.account)}` : '<span class="bad">미연결</span>'}</span></div>
-        <div class="line"><span>자동 동기화 (10분)</span><span>${i && i.autoSync ? '<span class="ok">켜짐</span>' : '꺼짐'}</span></div>
-        <div class="line"><span>일별 수익률 기록 (16시)</span><span>${i && i.dailyRecord ? '<span class="ok">켜짐</span>' : '꺼짐'}</span></div>
+        <div class="line"><span>자동 실행</span><span>${i && i.autoSync ? '<span class="ok">켜짐</span> · 10분 동기화 · 16시 수익률 기록 · 월 07시 백업' : '꺼짐'}</span></div>
         <div class="line"><span>마지막 동기화</span><span class="num">${i && i.lastSync ? kstTime(i.lastSync) : '–'}</span></div>
         ${k.snapshot ? `<div class="line"><span>계좌 D+2 예수금 / 총평가</span><span class="num">${won(k.snapshot.cash)} / ${won(k.snapshot.totalEval)}</span></div>` : ''}
         ${i && i.sheetUrl ? `<div class="line"><span>스프레드시트</span><a href="${esc(i.sheetUrl)}" target="_blank" rel="noopener">열기 ↗</a></div>` : ''}
       </div>
       <div class="actions">
         ${k.enabled ? kisBtns() : ''}
-        <button class="btn" data-act="toggleAuto">${i && i.autoSync ? '자동 동기화 끄기' : '자동 동기화 켜기'}</button>
+        <button class="btn" data-act="toggleAuto">${i && i.autoSync ? '자동 실행 끄기' : '자동 실행 켜기'}</button>
         <button class="btn" data-act="recordToday">오늘 수익률 기록</button>
         <button class="btn" data-act="rebuildHistory">수익률 이력 재구성</button>
       </div>
-      <div id="actResult"></div>
+      <div id="actResult">${flashHtml('actResult')}</div>
     </div>
     <div class="card"><h3>한국투자증권 계좌 연결 <span class="sub">KIS Developers OpenAPI</span></h3>
       <form class="form" id="kisForm" autocomplete="off">
@@ -986,15 +1075,96 @@ function viewAdmin() {
     </div>
   </div>
   <div class="grid g2" style="margin-top:14px">
+    ${backupCard(i)}
     <div class="card"><h3>데이터 점검 <span class="sub">${w.length}건</span></h3>
       ${w.length ? `<ul class="warnlist">${w.map(x => `<li><b>${esc(x.k)}</b> — ${esc(x.m)}</li>`).join('')}</ul>` : '<div class="empty">문제가 발견되지 않았습니다 ✓</div>'}
       <p class="hint">매매근거 미입력: ${S.m.trades.filter(t => !t.reason).length}건 → <a href="#trades" id="gotoMissing">매매기록에서 입력</a></p>
     </div>
-    <div class="card"><h3>동기화 로그</h3>
-      <div class="logbox">${i && i.log && i.log.length ? i.log.map(l => `<div><span class="muted num">${esc(kstTime(l[0]))}</span><b>${esc(l[1])}</b><span>${esc(l[2])}</span></div>`).join('') : '<div class="empty" style="display:block">기록 없음</div>'}</div>
-      ${isDemo() ? '' : `<form class="form" id="pwForm" style="margin-top:14px"><div class="row"><label>현재 비밀번호<input class="input" type="password" name="old"></label><label>새 비밀번호 (8자 이상)<input class="input" type="password" name="new"></label></div><div><button class="btn sm" type="submit">비밀번호 변경</button></div></form>`}
+  </div>
+  <div class="grid g2" style="margin-top:14px">
+    ${accessCard(i)}
+    <div class="card"><h3>변경 기록 <span class="sub">최근 30건 · 전체는 시트의 _로그</span></h3>
+      <div class="logbox" style="max-height:420px">${i && i.log && i.log.length ? i.log.map(l => `<div><span class="muted num">${esc(kstTime(l[0]))}</span><b>${esc(l[1])}</b><span>${esc(l[2])}</span></div>`).join('') : '<div class="empty" style="display:block">기록 없음</div>'}</div>
     </div>
   </div>`;
+}
+function accessCard(i) {
+  return `<div class="card"><h3>접근 권한</h3>
+    <div class="roles">
+      <div class="r"><b>방문자</b><span>로그인 없음 · 대시보드, 보유종목, 섹터 현황, 위험 지표<br><span class="muted">매매기록·실현손익은 서버에서 아예 전송하지 않음</span></span></div>
+      <div class="r"><b>부원</b><span>부원 비밀번호 · 방문자 화면 + 매매기록(매매근거·📌 주간회의), 실현손익<br><span class="muted">조회만 가능 — 매매 입력·수정, 계좌, 설정 접근 불가</span></span></div>
+      <div class="r"><b>관리자</b><span>관리자 비밀번호 · 전체 + 매매 입력·수정·삭제, 📌 표시, 계좌 연동, 설정, 백업</span></div>
+    </div>
+    ${isDemo() ? '<p class="hint">데모 모드에서는 비밀번호 없이 역할을 골라 둘러볼 수 있습니다.</p>' : `
+    <form class="form" id="memberPwForm" style="margin-top:16px">
+      <label>부원 비밀번호 ${i && i.memberPasswordSet ? '<span class="ok">설정됨</span>' : '<span class="bad">미설정 — 부원 로그인 불가</span>'}
+        <input class="input" type="password" name="pw" minlength="8" required placeholder="새 부원 비밀번호 (8자 이상, 관리자와 다르게)" autocomplete="new-password">
+        <span class="help">바꾸면 기존 부원 로그인은 모두 해제됩니다. 부원들에게 새 비밀번호를 공유하세요.</span></label>
+      <div><button class="btn sm primary" type="submit">${i && i.memberPasswordSet ? '부원 비밀번호 변경' : '부원 비밀번호 설정'}</button></div>
+    </form>
+    <form class="form" id="pwForm" style="margin-top:16px">
+      <div class="row"><label>현재 관리자 비밀번호<input class="input" type="password" name="old" required autocomplete="current-password"></label><label>새 관리자 비밀번호 (8자 이상)<input class="input" type="password" name="new" minlength="8" required autocomplete="new-password"></label></div>
+      <div><button class="btn sm" type="submit">관리자 비밀번호 변경</button></div>
+    </form>`}
+  </div>`;
+}
+function backupCard(i) {
+  const lock = i && i.sheetLock;
+  const locked = lock && lock.total && lock.locked === lock.total;
+  const bks = (i && i.backups) || [];
+  return `<div class="card"><h3>시트 백업 · 보호 <span class="sub">스프레드시트 = 저장소 겸 백업</span></h3>
+    <div class="status">
+      <div class="line"><span>원본 시트 잠금</span><span>${!lock ? '–' : locked ? '<span class="ok">잠김</span> · 소유자만 직접 수정 가능' : lock.locked ? `일부 잠김 (${lock.locked}/${lock.total})` : '<span class="bad">잠기지 않음</span>'}</span></div>
+      <div class="line"><span>자동 백업</span><span>${i && i.weeklyBackup ? '<span class="ok">매주 월요일 07시</span>' : '꺼짐 · "자동 실행 켜기"로 시작'}</span></div>
+      <div class="line"><span>상장기업 목록</span><span>${i && i.companiesUpdated ? kstTime(i.companiesUpdated) + ' 갱신 · 매월 자동' : '갱신 기록 없음'}</span></div>
+    </div>
+    ${bks.length ? `<div class="logbox" style="margin-top:10px;max-height:none">${bks.map(b => `<div style="grid-template-columns:1fr auto"><a href="${esc(b[1])}" target="_blank" rel="noopener">${esc(b[0])}</a><span class="muted">열기 ↗</span></div>`).join('')}</div>` : ''}
+    ${i && i.backupFolderUrl ? `<p class="hint" style="margin-top:8px"><a href="${esc(i.backupFolderUrl)}" target="_blank" rel="noopener">구글 드라이브 'VIM Fund 백업' 폴더 열기 ↗</a> · 최근 30개 보관</p>` : ''}
+    <div class="actions">
+      <button class="btn primary" data-act="backupNow">지금 백업</button>
+      <button class="btn" data-act="toggleLock" data-locked="${locked ? 1 : 0}">${locked ? '시트 잠금 해제' : '원본 시트 잠그기'}</button>
+      <button class="btn" data-act="updateCompanies">상장기업 목록 갱신</button>
+    </div>
+    <div id="bkResult">${flashHtml('bkResult')}</div>
+    <p class="hint">백업은 시트 전체를 <b>값으로</b> 복사한 새 스프레드시트입니다 (수식·스크립트·KIS 키 제외). 시트 잠금 후에도 웹 입력과 자동 동기화는 그대로 동작합니다.</p>
+    <div style="margin-top:14px;font-size:12px;font-weight:600;color:var(--text-2)">내 컴퓨터에 내려받기 (CSV · 엑셀에서 열림)</div>
+    <div class="actions" style="margin-top:8px">
+      <button class="btn sm" data-csv="trades">매매기록</button>
+      <button class="btn sm" data-csv="holdings">보유종목</button>
+      <button class="btn sm" data-csv="realized">실현손익</button>
+      <button class="btn sm" data-csv="history">일별 수익률</button>
+    </div>
+  </div>`;
+}
+function exportCsv(kind) {
+  const m = S.m;
+  const n2 = v => ok(v) ? Math.round(v * 100) / 100 : '';
+  const sets = {
+    trades: ['매매기록', ['거래일', '종목코드', '종목명', '단가', '수량(+매수/-매도)', '섹터', '매매근거', '출처', '주간회의'],
+      m.sorted.map(t => [t.date, t.code, t.name, t.price, t.qty, t.sector, t.reason, t.src, t.meeting])],
+    holdings: ['보유종목', ['종목코드', '종목명', '섹터', '수량', '평균단가', '현재가', '매입금액', '평가금액', '평가손익', '수익률', '보유비중'],
+      m.holdings.map(h => [h.code, h.name, h.sector, h.qty, n2(h.avg), h.price, Math.round(h.cost), Math.round(h.value), Math.round(h.pnl), h.ret, h.weight])],
+    realized: ['실현손익', ['일자', '종목코드', '종목명', '수량', '매입가', '매도가', '매입액', '매도액', '실현손익', '손익률'],
+      m.realized.map(r => [r.date, r.code, r.name, r.qty, n2(r.buy), r.sell, Math.round(r.buyAmt), Math.round(r.sellAmt), Math.round(r.pnl), r.pct])],
+    history: ['일별수익률', ['일자', 'KOSPI', 'KOSPI지수', 'KOSPI일간', 'AUM', '펀드지수', '펀드일간', '초과수익', '펀드낙폭', 'KOSPI낙폭'],
+      m.hist.rows.map(r => [r.date, r.kospi, n2(r.kIdx), r.kRet, Math.round(r.aum), n2(r.fIdx), r.fRet, r.ex, r.fDD, r.kDD])],
+  };
+  const [name, head, rows] = sets[kind];
+  const cell = v => {
+    if (v == null || (typeof v === 'number' && !isFinite(v))) return '';
+    let s = String(v);
+    if (typeof v === 'string' && /^[=+\-@]/.test(s)) s = "'" + s; // 엑셀 수식 실행 방지
+    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  const text = '﻿' + [head].concat(rows).map(r => r.map(cell).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  a.download = `VIM_${name}_${kstDate()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast(`${name} CSV를 내려받았습니다.`);
 }
 function reconTable() {
   const rows = S.recon;
@@ -1006,7 +1176,7 @@ function reconTable() {
     <td>${same ? '<span class="badge sector">일치</span>' : `<span class="badge warn">차이 ${qtyf(r.kisQty - r.sheetQty)}주</span>`}</td></tr>`; }).join('')}</tbody></table></div>`;
 }
 function afterAdmin() {
-  if (!S.admin) return;
+  if (!isAdmin()) return;
   if (!S.info) loadInfo();
   const box = $('#tgtRows');
   const draw = rows => {
@@ -1033,7 +1203,17 @@ function afterAdmin() {
     run('saveKis', { kis: f }, 'KIS 연결 정보를 저장했습니다. "연결 테스트"로 확인하세요.', false, true);
   };
   const pw = $('#pwForm');
-  if (pw) pw.onsubmit = e => { e.preventDefault(); const f = new FormData(pw); run('changePassword', { oldPassword: f.get('old'), newPassword: f.get('new') }, '비밀번호를 변경했습니다.').then(() => pw.reset()); };
+  if (pw) pw.onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(pw);
+    run('changePassword', { oldPassword: f.get('old'), newPassword: f.get('new') }, '관리자 비밀번호를 변경했습니다.')
+      .then(j => { if (j.token) setAuth({ token: j.token, role: 'admin' }, false); pw.reset(); }).catch(() => {});
+  };
+  const mpw = $('#memberPwForm');
+  if (mpw) mpw.onsubmit = e => {
+    e.preventDefault();
+    run('setMemberPassword', { password: new FormData(mpw).get('pw') }, '부원 비밀번호를 저장했습니다.', false, true).catch(() => {});
+  };
 }
 async function loadInfo() {
   try { const j = await apiPost('info'); S.info = j.info; if (S.tab === 'admin') render(); } catch (e) { toast(e.message, true); }
@@ -1043,7 +1223,7 @@ async function run(action, payload, msg, reload, reinfo) {
   try {
     const j = await apiPost(action, payload);
     if (msg) toast(msg);
-    if (reload) { if (isDemo()) recompute(); else await load(true); }
+    if (reload) await load(true);
     if (reinfo && !isDemo()) await loadInfo();
     return j;
   } catch (e) {
@@ -1053,14 +1233,27 @@ async function run(action, payload, msg, reload, reinfo) {
     document.body.style.cursor = '';
   }
 }
-async function adminAction(act) {
-  const out = $('#actResult');
-  const show = t => { if (out) out.innerHTML = `<div class="result">${esc(t)}</div>`; };
+function flashHtml(id) {
+  const t = S.flash && S.flash[id];
+  return t ? `<div class="result">${esc(t)}</div>` : '';
+}
+async function adminAction(act, btn) {
+  const id = ['backupNow', 'toggleLock', 'updateCompanies'].includes(act) ? 'bkResult' : 'actResult';
+  // 결과를 상태에 저장해 화면을 다시 그려도 메시지가 유지되게 함
+  const show = t => { S.flash = S.flash || {}; S.flash[id] = t; const o = document.getElementById(id); if (o) o.innerHTML = flashHtml(id); };
   try {
+    if (act === 'backupNow') { show('백업 중… (시트 크기에 따라 10~30초)'); const j = await run('backupNow', {}, null, false, true); show('✓ 백업 완료: ' + j.result); }
+    if (act === 'toggleLock') {
+      const on = !(btn && btn.dataset.locked === '1');
+      if (on && !confirm('원본 시트를 잠그면 스프레드시트 소유자 외에는 시트를 직접 수정할 수 없습니다.\n(웹 입력과 자동 동기화는 그대로 동작합니다)\n\n잠글까요?')) return;
+      const j = await run('setSheetLock', { on }, null, false, true);
+      show('✓ ' + j.result);
+    }
+    if (act === 'updateCompanies') { show('KIND에서 상장기업 목록을 받는 중…'); const j = await run('updateCompanies', {}, null, false, true); S.corp = null; show('✓ ' + j.result); }
     if (act === 'testKis') { show('연결 확인 중…'); const j = await run('testKis'); const r = j.result; show(`✓ 연결 성공\n보유 종목 ${r.holdings}개 · D+2 예수금 ${won(r.cash)} · 총평가 ${won(r.totalEval)}`); }
     if (act === 'syncNow') { show('동기화 중… (종목 수에 따라 수십 초 걸릴 수 있습니다)'); const j = await run('syncNow', {}, null, true, true); const r = j.result; show(`✓ 동기화 완료\n신규 체결 ${r.added}건 반영 · 시세 ${r.prices}종목 갱신 · D+2 예수금 ${won(r.cash)}`); }
     if (act === 'reconcile') { show('계좌 잔고 조회 중…'); const j = await run('reconcile'); S.recon = j.rows; render(); }
-    if (act === 'toggleAuto') { await run('setAutoSync', { on: !(S.info && S.info.autoSync) }, '자동 동기화 설정을 변경했습니다.', false, true); }
+    if (act === 'toggleAuto') { await run('setAutoSync', { on: !(S.info && S.info.autoSync) }, '자동 실행 설정을 변경했습니다.', false, true); }
     if (act === 'recordToday') { const j = await run('recordToday', {}, null, true, true); toast(j.result); }
     if (act === 'rebuildHistory') {
       if (!confirm('매매기록과 일별 종가로 수익률_DB 전체를 다시 계산해 덮어씁니다. 계속할까요?')) return;
@@ -1075,18 +1268,23 @@ async function adminAction(act) {
 /* ===================== 다이얼로그 ===================== */
 const dlg = $('#dlg');
 function openLogin(setup) {
-  dlg.innerHTML = `<form method="dialog" id="loginForm">
-    <div class="hd"><h3>${setup ? '관리자 비밀번호 만들기' : '관리자 로그인'}</h3><button class="btn ghost sm" value="cancel" formnovalidate>✕</button></div>
-    <div class="bd form">
-      ${isDemo() ? '<p class="help" style="margin:0">데모 모드입니다. 아무 비밀번호나 입력하면 관리자 화면을 둘러볼 수 있습니다.</p>' : ''}
-      ${setup ? `<p class="help" style="margin:0">처음 한 번만 필요합니다. Apps Script 편집기에서 <b>issueSetupCode</b> 함수를 실행하면 실행 로그에 설정 코드가 표시됩니다.</p>
+  const demo = isDemo() && !setup;
+  const body = demo
+    ? `<p class="help" style="margin:0">데모 모드입니다. 역할을 골라 둘러보세요.</p>`
+    : setup
+      ? `<p class="help" style="margin:0">처음 한 번만 필요합니다. Apps Script 편집기에서 <b>issueSetupCode</b> 함수를 실행하면 실행 로그에 설정 코드가 표시됩니다.</p>
         <label>설정 코드<input class="input" name="code" required autocomplete="one-time-code"></label>
-        <label>새 비밀번호 (8자 이상)<input class="input" type="password" name="pw" required minlength="8" autocomplete="new-password"></label>
+        <label>새 관리자 비밀번호 (8자 이상)<input class="input" type="password" name="pw" required minlength="8" autocomplete="new-password"></label>
         <label>새 비밀번호 확인<input class="input" type="password" name="pw2" required minlength="8" autocomplete="new-password"></label>`
-      : `<label>비밀번호<input class="input" type="password" name="pw" required autocomplete="current-password" autofocus></label>`}
-      <div class="err" id="loginErr"></div>
-    </div>
-    <div class="ft"><button class="btn primary" value="ok">${setup ? '만들고 로그인' : '로그인'}</button></div></form>`;
+      : `<p class="help" style="margin:0">부원 또는 관리자 비밀번호를 입력하세요. 입력한 비밀번호에 따라 권한이 정해집니다.</p>
+        <label>비밀번호<input class="input" type="password" name="pw" required autocomplete="current-password" autofocus></label>`;
+  const buttons = demo
+    ? '<button class="btn" value="member">부원으로 보기</button><button class="btn primary" value="admin">관리자로 보기</button>'
+    : `<button class="btn primary" value="ok">${setup ? '만들고 로그인' : '로그인'}</button>`;
+  dlg.innerHTML = `<form method="dialog" id="loginForm">
+    <div class="hd"><h3>${setup ? '관리자 비밀번호 만들기' : '로그인'}</h3><button class="btn ghost sm" value="cancel" formnovalidate>✕</button></div>
+    <div class="bd form">${body}<div class="err" id="loginErr"></div></div>
+    <div class="ft">${buttons}</div></form>`;
   dlg.showModal();
   $('#loginForm').onsubmit = async e => {
     if (e.submitter && e.submitter.value === 'cancel') return;
@@ -1095,26 +1293,31 @@ function openLogin(setup) {
     const err = $('#loginErr');
     try {
       let j;
-      if (setup) {
+      if (isDemo()) {
+        j = await apiPost('login', { role: e.submitter && e.submitter.value === 'admin' ? 'admin' : 'member' });
+      } else if (setup) {
         if (f.get('pw') !== f.get('pw2')) throw new Error('비밀번호가 서로 다릅니다.');
         j = await apiPost('setup', { code: f.get('code'), password: f.get('pw') });
       } else {
-        j = isDemo() ? await apiPost('login') : await fetch(CONFIG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'login', password: f.get('pw') }) }).then(r => r.json());
+        j = await fetch(CONFIG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'login', password: f.get('pw') }) }).then(r => r.json());
         if (j.error === 'NEED_SETUP') { openLogin(true); return; }
         if (!j.ok) throw new Error(j.error);
       }
-      setAdmin({ token: j.token });
+      setAuth({ token: j.token, role: j.role === 'admin' ? 'admin' : 'member' }, false);
       dlg.close();
-      toast('관리자로 로그인했습니다.');
-      go('admin');
+      await load(true);
+      toast(ROLE_NAME[role()] + '(으)로 로그인했습니다.');
+      go(isAdmin() ? 'admin' : 'trades');
     } catch (x) { err.textContent = x.message; }
   };
 }
-function setAdmin(a) {
-  S.admin = a; S.info = null; S.recon = null;
-  store.set('vim_admin', a ? JSON.stringify(a) : null);
-  if (!a && S.tab === 'admin') S.tab = 'dashboard';
-  if (S.m) { renderHeader(); render(); }
+/** 로그인 상태 변경. reload=true면 권한에 맞는 데이터를 다시 받아옵니다. */
+function setAuth(a, reload = true) {
+  S.auth = a; S.info = null; S.recon = null; S.flash = {};
+  store.set('vim_auth', a ? JSON.stringify(a) : null);
+  S.tab = validTab(S.tab);
+  if (reload) load(true);
+  else if (S.m) renderHeader();
 }
 
 async function openTrade(row) {
@@ -1138,6 +1341,10 @@ async function openTrade(row) {
       </div>
       <label>섹터<input class="input" name="sector" list="secList" value="${esc(t ? t.sector : '')}" placeholder="예: 반도체"></label>
       <label>매매근거 / 투자전략<textarea class="input" name="reason" rows="4">${esc(t ? t.reason : '')}</textarea></label>
+      <div class="row">
+        <label class="check"><input type="checkbox" name="isMeeting" ${t && t.meeting ? 'checked' : ''}> 📌 주간 회의에서 결정된 매매</label>
+        <label>회의일<input class="input" type="date" name="meeting" value="${esc((t && t.meeting) || lastMeeting() || '')}"></label>
+      </div>
       <datalist id="corpList"></datalist>
       <datalist id="secList">${sectors.map(s => `<option value="${esc(s)}">`).join('')}</datalist>
       <div class="err" id="trErr"></div>
@@ -1163,14 +1370,44 @@ async function openTrade(row) {
       date: f.get('date'), name: String(f.get('name')).trim(), code: String(f.get('code')).trim().toUpperCase(),
       price: +String(f.get('price')).replace(/,/g, ''), qty: side * +String(f.get('qty')).replace(/,/g, ''),
       sector: String(f.get('sector')).trim() || '미분류', reason: String(f.get('reason')).trim(),
+      meeting: f.get('isMeeting') ? (f.get('meeting') || f.get('date')) : '',
     };
     try {
       if (t) await apiPost('updateTrade', { row: t.row, trade, expect: { date: t.date, name: t.name } });
       else await apiPost('addTrade', { trade });
       dlg.close();
       toast(t ? '수정했습니다.' : '추가했습니다.');
-      if (isDemo()) recompute(); else await load(true);
+      await load(true);
     } catch (x) { $('#trErr').textContent = x.message; }
+  };
+}
+/** 가장 최근에 쓴 회의일 (같은 회의 결정을 연달아 표시할 때 기본값) */
+function lastMeeting() {
+  return S.m.trades.map(t => t.meeting).filter(Boolean).sort().pop() || '';
+}
+function openMeeting(row) {
+  const t = S.m.trades.find(x => x.row === row);
+  if (!t) return;
+  dlg.innerHTML = `<form method="dialog" id="meetForm">
+    <div class="hd"><h3>📌 주간 회의 결정 표시</h3><button class="btn ghost sm" value="cancel" formnovalidate>✕</button></div>
+    <div class="bd form">
+      <p style="margin:0">${esc(t.date)} · <b>${esc(t.name)}</b> ${t.qty > 0 ? '매수' : '매도'} ${qtyf(Math.abs(t.qty))}주 @ ${int(t.price)}원</p>
+      <label>회의일<input class="input" type="date" name="meeting" required value="${esc(t.meeting || lastMeeting() || t.date)}"><span class="help">이 매매를 결정한 주간 회의 날짜</span></label>
+      <div class="err" id="meetErr"></div>
+    </div>
+    <div class="ft">${t.meeting ? '<button class="btn danger" value="clear" formnovalidate>표시 해제</button>' : ''}<button class="btn" value="cancel" formnovalidate>취소</button><button class="btn primary" value="ok">저장</button></div></form>`;
+  dlg.showModal();
+  $('#meetForm').onsubmit = async e => {
+    const v = e.submitter && e.submitter.value;
+    if (v === 'cancel') return;
+    e.preventDefault();
+    const meeting = v === 'clear' ? '' : new FormData(e.target).get('meeting');
+    try {
+      await apiPost('setMeeting', { row, meeting, expect: { date: t.date, name: t.name } });
+      dlg.close();
+      toast(meeting ? `${meeting} 주간회의 결정으로 표시했습니다.` : '표시를 해제했습니다.');
+      await load(true);
+    } catch (x) { $('#meetErr').textContent = x.message; }
   };
 }
 function corpIndex() {
@@ -1210,8 +1447,13 @@ document.addEventListener('click', e => {
   if (ed) { openTrade(+ed.dataset.edit); return; }
   const dl = e.target.closest('[data-del]');
   if (dl) { delTrade(+dl.dataset.del); return; }
+  const mt = e.target.closest('[data-meet]');
+  if (mt) { openMeeting(+mt.dataset.meet); return; }
+  if (e.target.closest('[data-meetf]')) { S.tr.meeting = !S.tr.meeting; render(); return; }
   const act = e.target.closest('[data-act]');
-  if (act) { adminAction(act.dataset.act); return; }
+  if (act) { adminAction(act.dataset.act, act); return; }
+  const csv = e.target.closest('[data-csv]');
+  if (csv) { exportCsv(csv.dataset.csv); return; }
   if (e.target.id === 'addTrade') { openTrade(null); return; }
   if (e.target.id === 'more') { S.tr.limit += 100; render(); return; }
 });
@@ -1227,7 +1469,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'trMiss') { S.tr.missing = e.target.checked; render(); }
 });
 $('#adminBtn').onclick = async () => {
-  if (S.admin) { if (!isDemo()) apiPost('logout').catch(() => {}); setAdmin(null); toast('로그아웃했습니다.'); }
+  if (S.auth) { if (!isDemo()) apiPost('logout').catch(() => {}); setAuth(null); toast('로그아웃했습니다.'); }
   else openLogin(false);
 };
 window.addEventListener('hashchange', route);
@@ -1235,7 +1477,7 @@ window.addEventListener('popstate', route);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => S.m && render());
 
 (function init() {
-  try { const a = JSON.parse(store.get('vim_admin') || 'null'); if (a && a.token) S.admin = a; } catch (_) {}
+  try { const a = JSON.parse(store.get('vim_auth') || 'null'); if (a && a.token && ROLE_RANK[a.role]) S.auth = a; } catch (_) {}
   S.tab = validTab(location.hash.replace('#', ''));
   load();
   if (!isDemo()) setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) load(true); }, CONFIG.REFRESH_SEC * 1000);
