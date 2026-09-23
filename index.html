@@ -606,7 +606,47 @@ function buildHistory(raw, fund, cfg, warnings) {
 }
 
 /* ===================== 로딩 ===================== */
+/* 마지막으로 받은 데이터를 브라우저에 저장해 두고 다음 접속 때 즉시 표시합니다.
+ * 방문자용은 localStorage(계속 유지), 매매기록이 들어 있는 부원·관리자용은 sessionStorage(탭을 닫으면 삭제). */
+const DATA_CACHE = 'vim_data_v1';
+const cacheStore = () => (can('member') ? sessionStorage : localStorage);
+function readDataCache() {
+  try {
+    const o = JSON.parse(cacheStore().getItem(DATA_CACHE) || 'null');
+    if (o && o.api === CONFIG.API_URL && o.role === role() && o.data && o.data.config) return o.data;
+  } catch (_) {}
+  return null;
+}
+function writeDataCache(data) {
+  if (isDemo()) return;
+  try { cacheStore().setItem(DATA_CACHE, JSON.stringify({ api: CONFIG.API_URL, role: role(), at: Date.now(), data })); } catch (_) {}
+}
+function clearMemberCache() { try { sessionStorage.removeItem(DATA_CACHE); } catch (_) {} }
+function applyData(raw) {
+  S.raw = raw;
+  S.tab = validTab(S.tab);
+  S.m = compute(raw);
+  renderHeader();
+  render();
+}
+/** 관리자 작업 응답에 담겨 온 최신 데이터·관리자 정보를 바로 적용 (추가 요청 없음) */
+function applyRefresh(j) {
+  if (!j || !j.data) return false;
+  if (j.info) S.info = j.info;
+  S.stale = false;
+  writeDataCache(j.data);
+  applyData(j.data);
+  return true;
+}
+
 async function load(silent) {
+  if (!isDemo() && !S.m) {
+    const cached = readDataCache();
+    if (cached) {
+      S.stale = true;
+      try { applyData(cached); } catch (_) { S.m = null; }
+    }
+  }
   try {
     let raw;
     if (isDemo()) {
@@ -622,20 +662,21 @@ async function load(silent) {
     } else {
       raw = await apiGet('public');
     }
-    S.raw = raw;
-    S.tab = validTab(S.tab);
-    S.m = compute(raw);
-    renderHeader();
-    render();
+    S.stale = false;
+    writeDataCache(raw);
+    applyData(raw);
   } catch (e) {
-    if (!silent) $('#view').innerHTML = `<div class="card empty">데이터를 불러오지 못했습니다.<br><span class="muted">${esc(e.message)}</span></div>`;
+    const shown = !!S.m;
+    S.stale = false;
+    if (shown) { renderHeader(); toast('최신 데이터를 불러오지 못했습니다: ' + e.message, true); }
+    else if (!silent) $('#view').innerHTML = `<div class="card empty">데이터를 불러오지 못했습니다.<br><span class="muted">${esc(e.message)}</span></div>`;
     else toast('새로고침 실패: ' + e.message, true);
   }
 }
 
 function renderHeader() {
   const raw = S.raw;
-  const src = isDemo() ? '데모 데이터' : raw.source === 'kis' ? '한국투자증권 연동' : '스프레드시트 연동';
+  const src = isDemo() ? '데모 데이터' : S.stale ? '최신 정보 확인 중…' : raw.source === 'kis' ? '한국투자증권 연동' : '스프레드시트 연동';
   $('#srcChip').innerHTML = `<span class="dot"></span><span>${esc(src)}</span>`;
   $('#asOf').textContent = '기준 ' + kstTime(raw.asOf) + (raw.lastSync ? ' · 동기화 ' + kstTime(raw.lastSync) : '');
   $('#adminBtn').textContent = S.auth ? '로그아웃' : '로그인';
@@ -1060,6 +1101,7 @@ function viewAdmin() {
       <div class="status">
         <div class="line"><span>데이터 소스</span><span>${isDemo() ? '<span class="bad">API 미연결 (데모)</span>' : '<span class="ok">스프레드시트 연결됨</span>'}</span></div>
         <div class="line"><span>한국투자증권 계좌</span><span>${k.enabled ? `<span class="ok">연결됨</span> · ${k.env === 'mock' ? '모의투자' : '실전'} · ${esc(k.account)}` : '<span class="bad">미연결</span>'}</span></div>
+        <div class="line"><span>빠른 응답 (캐시 예열)</span><span>${i && i.cacheWarm ? '<span class="ok">켜짐</span> · 5분마다 미리 준비' : '첫 접속 후 자동 설치'}</span></div>
         <div class="line"><span>자동 실행</span><span>${i && i.autoSync ? '<span class="ok">켜짐</span> · 10분 동기화 · 16시 수익률 기록 · 월 07시 백업' : '꺼짐'}</span></div>
         <div class="line"><span>마지막 동기화</span><span class="num">${i && i.lastSync ? kstTime(i.lastSync) : '–'}</span></div>
         ${k.snapshot ? `<div class="line"><span>계좌 D+2 예수금 / 총평가</span><span class="num">${won(k.snapshot.cash)} / ${won(k.snapshot.totalEval)}</span></div>` : ''}
@@ -1258,13 +1300,16 @@ function afterAdmin() {
 async function loadInfo() {
   try { const j = await apiPost('info'); S.info = j.info; if (S.tab === 'admin') render(); } catch (e) { toast(e.message, true); }
 }
-async function run(action, payload, msg, reload, reinfo) {
+async function run(action, payload = {}, msg, reload, reinfo) {
   document.body.style.cursor = 'progress';
   try {
-    const j = await apiPost(action, payload);
+    const wantFresh = (reload || reinfo) && !isDemo();
+    const j = await apiPost(action, wantFresh ? Object.assign({ refresh: true }, payload) : payload);
     if (msg) toast(msg);
-    if (reload) await load(true);
-    if (reinfo && !isDemo()) await loadInfo();
+    if (!applyRefresh(j)) {
+      if (reload) await load(true);
+      if (reinfo && !isDemo()) await loadInfo();
+    }
     return j;
   } catch (e) {
     toast(e.message, true);
@@ -1360,6 +1405,7 @@ function openLogin(setup) {
 }
 /** 로그인 상태 변경. reload=true면 권한에 맞는 데이터를 다시 받아옵니다. */
 function setAuth(a, reload = true) {
+  if (!a) clearMemberCache();
   S.auth = a; S.info = null; S.recon = null; S.flash = {};
   store.set('vim_auth', a ? JSON.stringify(a) : null);
   S.tab = validTab(S.tab);
@@ -1420,11 +1466,12 @@ async function openTrade(row) {
       meeting: f.get('isMeeting') ? (f.get('meeting') || f.get('date')) : '',
     };
     try {
-      if (t) await apiPost('updateTrade', { row: t.row, trade, expect: { date: t.date, name: t.name } });
-      else await apiPost('addTrade', { trade });
+      const j = t
+        ? await apiPost('updateTrade', { row: t.row, trade, expect: { date: t.date, name: t.name }, refresh: !isDemo() })
+        : await apiPost('addTrade', { trade, refresh: !isDemo() });
       dlg.close();
       toast(t ? '수정했습니다.' : '추가했습니다.');
-      await load(true);
+      if (!applyRefresh(j)) await load(true);
     } catch (x) { $('#trErr').textContent = x.message; }
   };
 }
@@ -1446,10 +1493,10 @@ function openMeeting(row) {
   dlg.showModal();
   const save = async meeting => {
     try {
-      await apiPost('setMeeting', { row, meeting, expect: { date: t.date, name: t.name } });
+      const j = await apiPost('setMeeting', { row, meeting, expect: { date: t.date, name: t.name }, refresh: !isDemo() });
       dlg.close();
       toast(meeting ? `${meeting} 주간회의 결정으로 표시했습니다.` : '표시를 해제했습니다.');
-      await load(true);
+      if (!applyRefresh(j)) await load(true);
     } catch (x) { $('#meetErr').textContent = x.message; }
   };
   $('#meetForm').onsubmit = e => { e.preventDefault(); save(new FormData(e.target).get('meeting')); };
