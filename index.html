@@ -225,6 +225,11 @@ dialog .hd h3{margin:0;font-size:16px}
 dialog .bd{padding:16px 20px}
 dialog .ft{padding:0 20px 18px;display:flex;justify-content:flex-end;gap:8px}
 .err{color:var(--up);font-size:12.5px;min-height:1em}
+.pw-wrap{position:relative;display:block}
+.pw-wrap .input{width:100%;padding-right:42px}
+.pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;color:var(--muted);cursor:pointer;padding:5px;border-radius:6px;display:flex;align-items:center}
+.pw-eye:hover{color:var(--text);background:var(--grid)}
+.pw-eye:focus-visible{outline:2px solid var(--brand)}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d261b;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:calc(100vw - 32px)}
 .toast.err{background:#8a1f1c}
@@ -335,6 +340,22 @@ function toast(msg, isErr) {
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), isErr ? 5000 : 2800);
+}
+/* 비밀번호 칸 + 👁 보기 버튼 */
+const EYE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+const pwInput = attrs => `<span class="pw-wrap"><input class="input" type="password" ${attrs}><button type="button" class="pw-eye" data-eye aria-label="비밀번호 보기" title="비밀번호 보기">${EYE}</button></span>`;
+function toggleEye(btn) {
+  const inp = btn.previousElementSibling;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.innerHTML = show ? EYE_OFF : EYE;
+  const label = show ? '비밀번호 숨기기' : '비밀번호 보기';
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  inp.focus();
+  const n = inp.value.length;
+  try { inp.setSelectionRange(n, n); } catch (_) {}
 }
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
 const sd = a => { if (a.length < 2) return NaN; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
@@ -1056,7 +1077,7 @@ function viewAdmin() {
       <form class="form" id="kisForm" autocomplete="off">
         <div class="row">
           <label>App Key<input class="input" name="appKey" placeholder="${k.appKey ? esc(k.appKey) + ' (저장됨)' : 'PS…'}"></label>
-          <label>App Secret<input class="input" name="appSecret" type="password" placeholder="${k.enabled ? '변경할 때만 입력' : ''}"></label>
+          <label>App Secret${pwInput(`name="appSecret" autocomplete="off" placeholder="${k.enabled ? '변경할 때만 입력' : ''}"`)}</label>
         </div>
         <div class="row">
           <label>계좌번호 (앞 8자리)<input class="input" name="cano" inputmode="numeric" maxlength="8" placeholder="${k.account ? esc(k.account) : '12345678'}"></label>
@@ -1117,12 +1138,12 @@ function accessCard(i) {
     ${isDemo() ? '<p class="hint">데모 모드에서는 비밀번호 없이 역할을 골라 둘러볼 수 있습니다.</p>' : `
     <form class="form" id="memberPwForm" style="margin-top:16px">
       <label>부원 비밀번호 ${i && i.memberPasswordSet ? '<span class="ok">설정됨</span>' : '<span class="bad">미설정 — 부원 로그인 불가</span>'}
-        <input class="input" type="password" name="pw" minlength="8" required placeholder="새 부원 비밀번호 (8자 이상, 관리자와 다르게)" autocomplete="new-password">
+        ${pwInput('name="pw" minlength="8" required placeholder="새 부원 비밀번호 (8자 이상, 관리자와 다르게)" autocomplete="new-password"')}
         <span class="help">바꾸면 기존 부원 로그인은 모두 해제됩니다. 부원들에게 새 비밀번호를 공유하세요.</span></label>
       <div><button class="btn sm primary" type="submit">${i && i.memberPasswordSet ? '부원 비밀번호 변경' : '부원 비밀번호 설정'}</button></div>
     </form>
     <form class="form" id="pwForm" style="margin-top:16px">
-      <div class="row"><label>현재 관리자 비밀번호<input class="input" type="password" name="old" required autocomplete="current-password"></label><label>새 관리자 비밀번호 (8자 이상)<input class="input" type="password" name="new" minlength="8" required autocomplete="new-password"></label></div>
+      <div class="row"><label>현재 관리자 비밀번호${pwInput('name="old" required autocomplete="current-password"')}</label><label>새 관리자 비밀번호 (8자 이상)${pwInput('name="new" minlength="8" required autocomplete="new-password"')}</label></div>
       <div><button class="btn sm" type="submit">관리자 비밀번호 변경</button></div>
     </form>`}
   </div>`;
@@ -1300,15 +1321,15 @@ function openLogin(setup) {
     : setup
       ? `<p class="help" style="margin:0">처음 한 번만 필요합니다. Apps Script 편집기에서 <b>issueSetupCode</b> 함수를 실행하면 실행 로그에 설정 코드가 표시됩니다.</p>
         <label>설정 코드<input class="input" name="code" required autocomplete="one-time-code"></label>
-        <label>새 관리자 비밀번호 (8자 이상)<input class="input" type="password" name="pw" required minlength="8" autocomplete="new-password"></label>
-        <label>새 비밀번호 확인<input class="input" type="password" name="pw2" required minlength="8" autocomplete="new-password"></label>`
+        <label>새 관리자 비밀번호 (8자 이상)${pwInput('name="pw" required minlength="8" autocomplete="new-password"')}</label>
+        <label>새 비밀번호 확인${pwInput('name="pw2" required minlength="8" autocomplete="new-password"')}</label>`
       : `<p class="help" style="margin:0">부원 또는 관리자 비밀번호를 입력하세요. 입력한 비밀번호에 따라 권한이 정해집니다.</p>
-        <label>비밀번호<input class="input" type="password" name="pw" required autocomplete="current-password" autofocus></label>`;
+        <label>비밀번호${pwInput('name="pw" required autocomplete="current-password" autofocus')}</label>`;
   const buttons = demo
     ? '<button class="btn" value="member">부원으로 보기</button><button class="btn primary" value="admin">관리자로 보기</button>'
     : `<button class="btn primary" value="ok">${setup ? '만들고 로그인' : '로그인'}</button>`;
   dlg.innerHTML = `<form method="dialog" id="loginForm">
-    <div class="hd"><h3>${setup ? '관리자 비밀번호 만들기' : '로그인'}</h3><button class="btn ghost sm" value="cancel" formnovalidate>✕</button></div>
+    <div class="hd"><h3>${setup ? '관리자 비밀번호 만들기' : '로그인'}</h3><button type="button" class="btn ghost sm" data-close aria-label="닫기">✕</button></div>
     <div class="bd form">${body}<div class="err" id="loginErr"></div></div>
     <div class="ft">${buttons}</div></form>`;
   dlg.showModal();
@@ -1351,7 +1372,7 @@ async function openTrade(row) {
   const sectors = [...new Set((S.raw.targets || []).map(x => x[0]).filter(s => s !== '현금').concat(S.m.trades.map(x => x.sector)))];
   if (!S.corp && !isDemo()) apiGet('companies').then(j => { S.corp = j.companies; fillCorp(); }).catch(() => {});
   dlg.innerHTML = `<form method="dialog" id="trForm">
-    <div class="hd"><h3>${t ? '매매기록 수정' : '매매 입력'}</h3><button class="btn ghost sm" value="cancel" formnovalidate>✕</button></div>
+    <div class="hd"><h3>${t ? '매매기록 수정' : '매매 입력'}</h3><button type="button" class="btn ghost sm" data-close aria-label="닫기">✕</button></div>
     <div class="bd form">
       <div class="row">
         <label>거래일<input class="input" type="date" name="date" required value="${esc(t ? t.date : kstDate())}"></label>
@@ -1375,7 +1396,7 @@ async function openTrade(row) {
       <datalist id="secList">${sectors.map(s => `<option value="${esc(s)}">`).join('')}</datalist>
       <div class="err" id="trErr"></div>
     </div>
-    <div class="ft"><button class="btn" value="cancel" formnovalidate>취소</button><button class="btn primary" value="ok">${t ? '저장' : '추가'}</button></div></form>`;
+    <div class="ft"><button type="button" class="btn" data-close>취소</button><button class="btn primary" value="ok">${t ? '저장' : '추가'}</button></div></form>`;
   dlg.showModal();
   fillCorp();
   let side = !t || t.qty > 0 ? 1 : -1;
@@ -1415,19 +1436,15 @@ function openMeeting(row) {
   const t = S.m.trades.find(x => x.row === row);
   if (!t) return;
   dlg.innerHTML = `<form method="dialog" id="meetForm">
-    <div class="hd"><h3>📌 주간 회의 결정 표시</h3><button class="btn ghost sm" value="cancel" formnovalidate>✕</button></div>
+    <div class="hd"><h3>📌 주간 회의 결정 표시</h3><button type="button" class="btn ghost sm" data-close aria-label="닫기">✕</button></div>
     <div class="bd form">
       <p style="margin:0">${esc(t.date)} · <b>${esc(t.name)}</b> ${t.qty > 0 ? '매수' : '매도'} ${qtyf(Math.abs(t.qty))}주 @ ${int(t.price)}원</p>
       <label>회의일<input class="input" type="date" name="meeting" required value="${esc(t.meeting || lastMeeting() || t.date)}"><span class="help">이 매매를 결정한 주간 회의 날짜</span></label>
       <div class="err" id="meetErr"></div>
     </div>
-    <div class="ft">${t.meeting ? '<button class="btn danger" value="clear" formnovalidate>표시 해제</button>' : ''}<button class="btn" value="cancel" formnovalidate>취소</button><button class="btn primary" value="ok">저장</button></div></form>`;
+    <div class="ft">${t.meeting ? '<button type="button" class="btn danger" id="meetClear">표시 해제</button>' : ''}<button type="button" class="btn" data-close>취소</button><button class="btn primary" value="ok">저장</button></div></form>`;
   dlg.showModal();
-  $('#meetForm').onsubmit = async e => {
-    const v = e.submitter && e.submitter.value;
-    if (v === 'cancel') return;
-    e.preventDefault();
-    const meeting = v === 'clear' ? '' : new FormData(e.target).get('meeting');
+  const save = async meeting => {
     try {
       await apiPost('setMeeting', { row, meeting, expect: { date: t.date, name: t.name } });
       dlg.close();
@@ -1435,6 +1452,8 @@ function openMeeting(row) {
       await load(true);
     } catch (x) { $('#meetErr').textContent = x.message; }
   };
+  $('#meetForm').onsubmit = e => { e.preventDefault(); save(new FormData(e.target).get('meeting')); };
+  if ($('#meetClear')) $('#meetClear').onclick = () => save('');
 }
 function corpIndex() {
   const m = new Map();
@@ -1455,6 +1474,9 @@ async function delTrade(row) {
 
 /* ===================== 이벤트 ===================== */
 document.addEventListener('click', e => {
+  const eye = e.target.closest('[data-eye]');
+  if (eye) { e.preventDefault(); toggleEye(eye); return; }
+  if (e.target.closest('[data-close]')) { dlg.close(); return; }
   const link = e.target.closest('a[href^="#"]');
   if (link && link.getAttribute('href').length > 1) { e.preventDefault(); if (link.id === 'gotoMissing') S.tr.missing = true; go(link.getAttribute('href').slice(1)); return; }
   const tab = e.target.closest('[data-tab]');
