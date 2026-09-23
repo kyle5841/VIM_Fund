@@ -340,20 +340,39 @@ const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
 const sd = a => { if (a.length < 2) return NaN; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
 
 /* ===================== API ===================== */
+/* 여러 번 보내도 결과가 같은 요청만 자동 재시도 (매매 입력·수정·삭제 등은 제외) */
+const SAFE_RETRY = ['public', 'companies', 'data', 'info', 'login', 'testKis', 'syncNow', 'reconcile'];
+
+/** 응답을 JSON으로 읽고, Google이 HTML 오류 페이지를 보내면 그 제목·내용을 담은 오류로 바꿉니다. */
+async function readJson(r) {
+  const text = await r.text();
+  try { return JSON.parse(text); } catch (_) {}
+  const title = ((text.match(/<title>([^<]*)<\/title>/i) || [])[1] || '').trim();
+  const body = text.replace(/<(style|script)[\s\S]*?<\/\1>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const err = new Error(`서버가 데이터 대신 오류 페이지를 보냈습니다 (HTTP ${r.status}${title ? ' · ' + title : ''})${body ? ' — ' + body : ''}`);
+  err.nonJson = true;
+  return Promise.reject(err);
+}
+async function withRetry(action, send) {
+  try { return await send(); }
+  catch (e) {
+    if (!e.nonJson || !SAFE_RETRY.includes(action)) throw e;
+    await new Promise(r => setTimeout(r, 1500));
+    return send();
+  }
+}
 async function apiGet(action) {
-  const r = await fetch(CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + 'action=' + action, { cache: 'no-store' });
-  const j = await r.json();
+  const j = await withRetry(action, async () => readJson(await fetch(CONFIG.API_URL + (CONFIG.API_URL.includes('?') ? '&' : '?') + 'action=' + action, { cache: 'no-store' })));
   if (!j.ok) throw new Error(j.error || '요청 실패');
   return j;
 }
 async function apiPost(action, payload = {}) {
   if (isDemo()) return demoPost(action, payload);
-  const r = await fetch(CONFIG.API_URL, {
+  const j = await withRetry(action, async () => readJson(await fetch(CONFIG.API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify(Object.assign({ action, token: S.auth && S.auth.token }, payload)),
-  });
-  const j = await r.json();
+  })));
   if (!j.ok) {
     if (j.error === 'AUTH') { setAuth(null, false); throw new Error('로그인이 만료되었습니다. 다시 로그인하세요.'); }
     throw new Error(j.error || '요청 실패');
@@ -1299,7 +1318,7 @@ function openLogin(setup) {
         if (f.get('pw') !== f.get('pw2')) throw new Error('비밀번호가 서로 다릅니다.');
         j = await apiPost('setup', { code: f.get('code'), password: f.get('pw') });
       } else {
-        j = await fetch(CONFIG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'login', password: f.get('pw') }) }).then(r => r.json());
+        j = await withRetry('login', async () => readJson(await fetch(CONFIG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'login', password: f.get('pw') }) })));
         if (j.error === 'NEED_SETUP') { openLogin(true); return; }
         if (!j.ok) throw new Error(j.error);
       }
