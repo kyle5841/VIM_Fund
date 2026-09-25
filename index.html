@@ -231,6 +231,9 @@ dialog .ft{padding:0 20px 18px;display:flex;justify-content:flex-end;gap:8px}
 .pw-eye:hover{color:var(--text);background:var(--grid)}
 .pw-eye:focus-visible{outline:2px solid var(--brand)}
 
+.pending{position:fixed;right:16px;bottom:16px;z-index:90;display:flex;align-items:center;gap:8px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.pending::before{content:'';width:10px;height:10px;border-radius:50%;border:2px solid var(--brand-strong);border-top-color:transparent;animation:vimspin .8s linear infinite}
+@keyframes vimspin{to{transform:rotate(360deg)}}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1d261b;color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:calc(100vw - 32px)}
 .toast.err{background:#8a1f1c}
 footer{color:var(--muted);font-size:12px;text-align:center;padding:24px 0 40px}
@@ -271,6 +274,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:24px 0 40px}
 <footer><div class="wrap">VIM · Various Investment Methods — 본 페이지는 펀드 운용 현황 공유 목적이며 투자 권유가 아닙니다.</div></footer>
 
 <dialog id="dlg"></dialog>
+<div class="pending" id="pending" hidden>저장 중…</div>
 
 <script>
 'use strict';
@@ -639,6 +643,62 @@ function applyRefresh(j) {
   return true;
 }
 
+/* ===================== 즉시 반영 =====================
+ * 관리자가 저장하면 화면을 먼저 바꾸고, 서버 저장은 순서대로 뒤에서 진행합니다.
+ * 서버 저장이 실패하면 서버 기준 데이터로 다시 불러오고 오류를 알립니다. */
+const TEMP_ROW = 1e9; // 서버 저장 전 새 매매의 임시 행 번호
+const Q = { busy: false, items: [], seq: 0 };
+function updatePending() {
+  const el = $('#pending');
+  el.hidden = !Q.items.length;
+  el.textContent = Q.items.length > 1 ? `저장 중… ${Q.items.length}건` : '저장 중…';
+}
+function mutate(action, payload, applyLocal, doneMsg) {
+  if (isDemo()) { // 데모는 원래 바로 반영됨
+    return apiPost(action, payload).then(() => { toast(doneMsg); return load(true); }).catch(e => toast(e.message, true));
+  }
+  const raw = JSON.parse(JSON.stringify(S.raw));
+  applyLocal(raw);
+  applyData(raw);
+  Q.items.push({ action, payload, doneMsg });
+  updatePending();
+  if (!Q.busy) drainQueue();
+}
+async function drainQueue() {
+  Q.busy = true;
+  while (Q.items.length) {
+    const it = Q.items[0];
+    try {
+      const j = await apiPost(it.action, Object.assign({ refresh: true }, it.payload));
+      Q.items.shift();
+      if (!Q.items.length) { applyRefresh(j); toast(it.doneMsg); } // 마지막 저장의 서버 결과로 화면 확정
+    } catch (e) {
+      const dropped = Q.items.length - 1;
+      Q.items = [];
+      updatePending();
+      toast(`저장 실패: ${e.message}${dropped ? ` (뒤이은 ${dropped}건도 취소)` : ''} — 서버 기준으로 다시 불러왔습니다.`, true);
+      await load(true);
+    }
+    updatePending();
+  }
+  Q.busy = false;
+  updatePending();
+}
+/* 매매기록 배열 [거래일, 코드, 종목명, 단가, 수량, 섹터, 근거, 행, 출처, 회의일]을 서버와 같은 규칙으로 바꾸는 함수들 */
+const local = {
+  add: t => raw => { raw.trades.push([t.date, t.code, t.name, t.price, t.qty, t.sector, t.reason, TEMP_ROW + (++Q.seq), 'WEB', t.meeting || '']); },
+  update: (row, t) => raw => {
+    const x = raw.trades.find(r => r[7] === row);
+    if (x) { x.splice(0, 7, t.date, t.code, t.name, t.price, t.qty, t.sector, t.reason); x[9] = t.meeting !== undefined ? t.meeting : (x[9] || ''); }
+  },
+  remove: row => raw => { // 서버도 아래 행을 한 칸씩 당김
+    raw.trades = raw.trades.filter(r => r[7] !== row);
+    raw.trades.forEach(r => { if (r[7] > row && r[7] < TEMP_ROW) r[7]--; });
+  },
+  meeting: (row, m) => raw => { const x = raw.trades.find(r => r[7] === row); if (x) x[9] = m || ''; },
+};
+window.addEventListener('beforeunload', e => { if (Q.items.length) { e.preventDefault(); e.returnValue = ''; } });
+
 async function load(silent) {
   if (!isDemo() && !S.m) {
     const cached = readDataCache();
@@ -931,7 +991,7 @@ function tradeTable(list, full) {
       <td class="r num">${int(Math.abs(t.qty) * t.price)}</td>
       <td><span class="badge sector">${esc(t.sector)}</span></td>
       <td class="reason">${t.reason ? `<div class="clamp" data-clamp>${esc(t.reason)}</div>` : '<span class="none">—</span>'}</td>
-      ${admin ? `<td><button class="btn sm" data-meet="${t.row}" title="주간 회의 결정 표시">📌${t.meeting ? ' ✓' : ''}</button> <button class="btn sm" data-edit="${t.row}">수정</button> <button class="btn sm danger" data-del="${t.row}">삭제</button></td>` : ''}
+      ${admin ? `<td>${t.row >= TEMP_ROW ? '<span class="badge kis">저장 중</span>' : `<button class="btn sm" data-meet="${t.row}" title="주간 회의 결정 표시">📌${t.meeting ? ' ✓' : ''}</button> <button class="btn sm" data-edit="${t.row}">수정</button> <button class="btn sm danger" data-del="${t.row}">삭제</button>`}</td>` : ''}
     </tr>`).join('')}</tbody></table></div>`;
 }
 function viewTrades() {
@@ -1275,12 +1335,18 @@ function afterAdmin() {
   box.addEventListener('input', () => { rows = read(); const sum = rows.reduce((s, r) => s + (+r[1] || 0), 0); $('#tgtSum').innerHTML = `합계 <b class="${Math.abs(sum - 1) < 0.0005 ? 'ok' : 'bad'}">${(sum * 100).toFixed(1)}%</b>`; });
   box.addEventListener('click', e => { const b = e.target.closest('[data-trm]'); if (b) { rows = read(); rows.splice(+b.dataset.trm, 1); draw(rows); } });
   $('#tgtAdd').onclick = () => { rows = read(); rows.push(['', null]); draw(rows); };
-  $('#tgtForm').onsubmit = e => { e.preventDefault(); rows = read().filter(r => r[0]); run('saveTargets', { targets: rows }, '목표비중을 저장했습니다.', true); };
+  $('#tgtForm').onsubmit = e => {
+    e.preventDefault();
+    rows = read().filter(r => r[0]);
+    const targets = rows.map(r => [r[0], r[1]]);
+    mutate('saveTargets', { targets }, raw => { raw.targets = targets; }, '목표비중을 저장했습니다.');
+  };
   $('#cfgForm').onsubmit = e => {
     e.preventDefault();
     const f = new FormData(e.target);
     const config = { seed: +String(f.get('seed')).replace(/[^\d.]/g, ''), rf: +f.get('rf') / 100, days: +f.get('days'), cashMode: f.get('cashMode') };
-    run('saveConfig', { config }, '펀드 설정을 저장했습니다.', true);
+    if (!(config.seed > 0) || !(config.days > 0) || !isFinite(config.rf)) { toast('설정값을 확인하세요.', true); return; }
+    mutate('saveConfig', { config }, raw => { Object.assign(raw.config, config); }, '펀드 설정을 저장했습니다.');
   };
   $('#kisForm').onsubmit = e => {
     e.preventDefault();
@@ -1307,7 +1373,7 @@ async function run(action, payload = {}, msg, reload, reinfo) {
   document.body.style.cursor = 'progress';
   try {
     const wantFresh = (reload || reinfo) && !isDemo();
-    const j = await apiPost(action, wantFresh ? Object.assign({ refresh: true }, payload) : payload);
+    const j = await apiPost(action, wantFresh ? Object.assign({ refresh: true, refreshInfo: !!reinfo }, payload) : payload);
     if (msg) toast(msg);
     if (!applyRefresh(j)) {
       if (reload) await load(true);
@@ -1400,7 +1466,8 @@ function openLogin(setup) {
       }
       setAuth({ token: j.token, role: j.role === 'admin' ? 'admin' : 'member' }, false);
       dlg.close();
-      await load(true);
+      if (j.data) { S.stale = false; writeDataCache(j.data); applyData(j.data); } // 로그인 응답에 담긴 데이터로 바로 표시
+      else await load(true);
       toast(ROLE_NAME[role()] + '(으)로 로그인했습니다.');
       go(isAdmin() ? 'admin' : 'trades');
     } catch (x) { err.textContent = x.message; }
@@ -1468,14 +1535,10 @@ async function openTrade(row) {
       sector: String(f.get('sector')).trim() || '미분류', reason: String(f.get('reason')).trim(),
       meeting: f.get('isMeeting') ? (f.get('meeting') || f.get('date')) : '',
     };
-    try {
-      const j = t
-        ? await apiPost('updateTrade', { row: t.row, trade, expect: { date: t.date, name: t.name }, refresh: !isDemo() })
-        : await apiPost('addTrade', { trade, refresh: !isDemo() });
-      dlg.close();
-      toast(t ? '수정했습니다.' : '추가했습니다.');
-      if (!applyRefresh(j)) await load(true);
-    } catch (x) { $('#trErr').textContent = x.message; }
+    try { normTradeInput(trade); } catch (x) { $('#trErr').textContent = x.message; return; }
+    dlg.close();
+    if (t) mutate('updateTrade', { row: t.row, trade, expect: { date: t.date, name: t.name } }, local.update(t.row, trade), '수정했습니다.');
+    else mutate('addTrade', { trade }, local.add(trade), '추가했습니다.');
   };
 }
 /** 가장 최근에 쓴 회의일 (같은 회의 결정을 연달아 표시할 때 기본값) */
@@ -1494,13 +1557,10 @@ function openMeeting(row) {
     </div>
     <div class="ft">${t.meeting ? '<button type="button" class="btn danger" id="meetClear">표시 해제</button>' : ''}<button type="button" class="btn" data-close>취소</button><button class="btn primary" value="ok">저장</button></div></form>`;
   dlg.showModal();
-  const save = async meeting => {
-    try {
-      const j = await apiPost('setMeeting', { row, meeting, expect: { date: t.date, name: t.name }, refresh: !isDemo() });
-      dlg.close();
-      toast(meeting ? `${meeting} 주간회의 결정으로 표시했습니다.` : '표시를 해제했습니다.');
-      if (!applyRefresh(j)) await load(true);
-    } catch (x) { $('#meetErr').textContent = x.message; }
+  const save = meeting => {
+    dlg.close();
+    mutate('setMeeting', { row, meeting, expect: { date: t.date, name: t.name } }, local.meeting(row, meeting),
+      meeting ? `${meeting} 주간회의 결정으로 표시했습니다.` : '표시를 해제했습니다.');
   };
   $('#meetForm').onsubmit = e => { e.preventDefault(); save(new FormData(e.target).get('meeting')); };
   if ($('#meetClear')) $('#meetClear').onclick = () => save('');
@@ -1519,7 +1579,7 @@ function fillCorp() {
 async function delTrade(row) {
   const t = S.m.trades.find(x => x.row === row);
   if (!t || !confirm(`${t.date} ${t.name} ${t.qty > 0 ? '매수' : '매도'} ${qtyf(Math.abs(t.qty))}주 기록을 삭제할까요?`)) return;
-  await run('deleteTrade', { row, expect: { date: t.date, name: t.name } }, '삭제했습니다.', true).catch(() => {});
+  mutate('deleteTrade', { row, expect: { date: t.date, name: t.name } }, local.remove(row), '삭제했습니다.');
 }
 
 /* ===================== 이벤트 ===================== */
@@ -1579,7 +1639,7 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
   S.tab = validTab(location.hash.replace('#', ''));
   $('#srcChip').hidden = !(isDemo() || isAdmin()); // 불러오는 중 표시도 관리자(또는 데모)만
   load();
-  if (!isDemo()) setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]')) load(true); }, CONFIG.REFRESH_SEC * 1000);
+  if (!isDemo()) setInterval(() => { if (!document.hidden && !document.querySelector('dialog[open]') && !Q.busy) load(true); }, CONFIG.REFRESH_SEC * 1000);
 })();
 </script>
 </body>
