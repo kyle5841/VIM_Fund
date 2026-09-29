@@ -1453,7 +1453,7 @@ async function adminAction(act, btn) {
     }
     if (act === 'updateCompanies') { show('KIND에서 상장기업 목록을 받는 중…'); const j = await run('updateCompanies', {}, null, false, true); S.corp = null; show('✓ ' + j.result); }
     if (act === 'testKis') { show('연결 확인 중…'); const j = await run('testKis'); const r = j.result; show(`✓ 연결 성공\n보유 종목 ${r.holdings}개 · D+2 예수금 ${won(r.cash)} · 총평가 ${won(r.totalEval)}`); }
-    if (act === 'syncNow') { show('동기화 중… (종목 수에 따라 수십 초 걸릴 수 있습니다)'); const j = await run('syncNow', {}, null, true, true); const r = j.result; show(`✓ 동기화 완료\n신규 체결 ${r.added}건 반영 · 시세 ${r.prices}종목 갱신 · D+2 예수금 ${won(r.cash)}`); }
+    if (act === 'syncNow') { show('동기화 중… (종목 수에 따라 수십 초 걸릴 수 있습니다)'); const j = await run('syncNow', {}, null, true, true); const r = j.result; show(`✓ 동기화 완료\n신규 체결 ${r.added}건 반영 · 시세 ${r.prices}종목 갱신 · D+2 예수금 ${won(r.cash)}` + (r.failed && r.failed.length ? `\n⚠ 기록하지 못한 체결 ${r.failed.length}건 (다음 동기화 때 다시 시도): ${r.failed.join(', ')}` : '')); }
     if (act === 'reconcile') {
       show('계좌 잔고 조회 중…');
       const j = await run('reconcile');
@@ -1553,7 +1553,7 @@ async function openTrade(row) {
         <label>단가 (원)<input class="input num" name="price" inputmode="decimal" required value="${t ? t.price : ''}"></label>
         <label>수량 (주)<input class="input num" name="qty" inputmode="decimal" required value="${t ? Math.abs(t.qty) : ''}"></label>
       </div>
-      <label>섹터<input class="input" name="sector" list="secList" value="${esc(t ? t.sector : '')}" placeholder="예: 반도체"></label>
+      <label>섹터<input class="input" name="sector" list="secList" value="${esc(t && t.sector !== '미분류' ? t.sector : '')}" placeholder="예: 반도체 (모르면 비워 두기 → 미분류)"></label>
       <label>매매근거 / 투자전략<textarea class="input" name="reason" rows="4">${esc(t ? t.reason : '')}</textarea></label>
       <div class="row">
         <label class="check"><input type="checkbox" name="isMeeting" ${t && t.meeting ? 'checked' : ''}> 📌 주간 회의에서 결정된 매매</label>
@@ -1574,7 +1574,7 @@ async function openTrade(row) {
     const c = corpIndex().get(n);
     if (c) form.code.value = c;
     const known = S.m.trades.slice().reverse().find(x => x.name === n);
-    if (known && !form.sector.value) form.sector.value = known.sector;
+    if (known && !form.sector.value && known.sector !== '미분류') form.sector.value = known.sector;
   });
   form.onsubmit = async e => {
     if (e.submitter && e.submitter.value === 'cancel') return;
@@ -1583,7 +1583,7 @@ async function openTrade(row) {
     const trade = {
       date: f.get('date'), name: String(f.get('name')).trim(), code: String(f.get('code')).trim().toUpperCase(),
       price: +String(f.get('price')).replace(/,/g, ''), qty: side * +String(f.get('qty')).replace(/,/g, ''),
-      sector: String(f.get('sector')).trim() || '미분류', reason: String(f.get('reason')).trim(),
+      sector: String(f.get('sector')).trim(), reason: String(f.get('reason')).trim(), // 빈칸 = 미분류 (시트 섹터 칸 규칙에 '미분류'가 없어 빈칸으로 저장)
       meeting: f.get('isMeeting') ? (f.get('meeting') || f.get('date')) : '',
     };
     try { normTradeInput(trade); } catch (x) { $('#trErr').textContent = x.message; return; }
