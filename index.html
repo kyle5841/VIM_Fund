@@ -685,6 +685,7 @@ const BUSY_TEXT = {
   changePassword: '비밀번호 변경 중…', setMemberPassword: '부원 비밀번호 저장 중…',
   stopLossSave: '자동 손절 설정 저장 중…', stopLossCheck: '보유종목 손실률 점검 중…',
   alertSave: '알림 설정 저장 중…', alertCheck: '보유종목 수익률 확인 중…', alertDailyTest: '리포트 보내는 중…',
+  tgSetAdminChat: '시스템 알림 받을 사람 저장 중…', tgAdminTest: '테스트 메시지 보내는 중…', tgClearAdmin: '해제 중…',
   tgSave: '텔레그램 봇 확인 중…', tgFindChats: '단체방 찾는 중…', tgSetChat: '알림 받을 방 저장 중…', tgTest: '테스트 메시지 보내는 중…', tgDisconnect: '텔레그램 연결 해제 중…',
 };
 
@@ -1338,6 +1339,7 @@ function telegramCard(i) {
     <div class="status">
       <div class="line"><span>봇</span><span>${t.bot ? `<span class="ok">@${esc(t.bot)}</span>` : '<span class="bad">설정 안 됨</span>'}</span></div>
       <div class="line"><span>알림 받을 방</span><span>${t.chatId ? `<span class="ok">${esc(t.chatTitle || t.chatId)}</span>` : '<span class="bad">선택 안 됨</span>'}</span></div>
+      <div class="line"><span>시스템 알림 받을 사람</span><span>${t.adminChatId ? `<span class="ok">${esc(t.adminChatTitle || t.adminChatId)}</span> · 개인 대화로만` : '<span class="muted">지정 안 됨 (시스템 이상 알림 안 보냄)</span>'}</span></div>
       ${last ? `<div class="line"><span>마지막 전송</span><span>${last.ok ? '<span class="ok">성공</span>' : '<span class="bad">실패</span>'} · ${kstTime(last.at)}</span></div>` : ''}
     </div>
     <details style="margin-top:10px"${t.chatId ? '' : ' open'}><summary style="cursor:pointer;font-weight:600">설정 방법 (처음 한 번)</summary>
@@ -1348,6 +1350,7 @@ function telegramCard(i) {
         <li>운영진 <b>단체방</b>을 만들고 봇을 멤버로 초대 (방 정보 → 멤버 추가 → 봇 아이디 검색)</li>
         <li>단체방에 <code>/start@${esc(t.bot || '봇아이디')}</code> 를 보내고 → 아래 <b>단체방 찾기</b> → 목록에서 선택</li>
         <li><b>테스트 메시지 보내기</b>로 모두에게 알림이 오는지 확인</li>
+        <li>시스템 이상 알림을 혼자 받으려면: 텔레그램에서 <code>@${esc(t.bot || '봇아이디')}</code> 검색 → 1:1 대화 <b>시작</b>(/start) → <b>단체방 찾기</b> → '개인 대화' 옆 <b>시스템 알림 받기</b></li>
       </ol>
     </details>
     <form class="form" id="tgForm" autocomplete="off" style="margin-top:12px">
@@ -1357,10 +1360,13 @@ function telegramCard(i) {
         <button class="btn primary" type="submit">저장</button>
         ${t.tokenSet ? '<button class="btn" type="button" data-act="tgFindChats">단체방 찾기</button>' : ''}
         ${t.chatId ? '<button class="btn" type="button" data-act="tgTest">테스트 메시지 보내기</button>' : ''}
+        ${t.adminChatId ? '<button class="btn" type="button" data-act="tgAdminTest">시스템 알림 테스트</button><button class="btn" type="button" data-act="tgClearAdmin">개인 대화 해제</button>' : ''}
         ${t.tokenSet ? '<button class="btn danger" type="button" data-act="tgDisconnect">연결 해제</button>' : ''}
       </div>
     </form>
-    ${chats ? (chats.length ? `<div class="logbox" style="margin-top:10px;max-height:none">${chats.map(c => `<div style="grid-template-columns:1fr auto;align-items:center"><span><b>${esc(c.title)}</b> <span class="muted">${c.type === 'private' ? '개인 대화' : '단체방'}</span></span><button class="btn sm${c.id === t.chatId ? '' : ' primary'}" type="button" data-act="tgPick" data-chat="${esc(c.id)}" data-title="${esc(c.title)}">${c.id === t.chatId ? '선택됨' : '이 방으로'}</button></div>`).join('')}</div>` : '') : ''}
+    ${chats ? (chats.length ? `<div class="logbox" style="margin-top:10px;max-height:none">${chats.map(c => `<div style="grid-template-columns:1fr auto;align-items:center"><span><b>${esc(c.title)}</b> <span class="muted">${c.type === 'private' ? '개인 대화' : '단체방'}</span></span>${c.type === 'private'
+      ? `<button class="btn sm${c.id === t.adminChatId ? '' : ' primary'}" type="button" data-act="tgPickAdmin" data-chat="${esc(c.id)}" data-title="${esc(c.title)}">${c.id === t.adminChatId ? '시스템 알림 받는 중' : '시스템 알림 받기'}</button>`
+      : `<button class="btn sm${c.id === t.chatId ? '' : ' primary'}" type="button" data-act="tgPick" data-chat="${esc(c.id)}" data-title="${esc(c.title)}">${c.id === t.chatId ? '선택됨' : '이 방으로'}</button>`}</div>`).join('')}</div>` : '') : ''}
     <div id="tgResult">${flashHtml('tgResult')}</div>
     <p class="hint">봇 토큰은 Apps Script 스크립트 속성에만 저장됩니다. 방에 사람을 추가하거나 빼면 알림 받는 사람도 바로 바뀝니다.</p>
   </div>`;
@@ -1380,7 +1386,8 @@ function alertsCard(i) {
       <div class="row"><label>수익·손실 알림 단위 (%)<input class="input num" name="step" inputmode="decimal" value="${c.step}"></label></div>
       ${box('fill', '🔔 체결 알림', '계좌에서 매수·매도가 체결되면 (매도는 실현손익 포함)')}
       ${box('daily', '📊 장 마감 리포트', '평일 16시경 기준가 · KOSPI 대비 · AUM · 오늘 체결 · 수익/손실 상위 종목')}
-      ${box('sys', '⚠️ 시스템 이상', '자동 동기화가 30분 넘게 실패하거나, 체결 기록·장 마감 기록·주간 백업이 실패하면')}
+      ${box('sys', '⚠️ 시스템 이상 — 관리자 개인 대화로만', '자동 동기화가 30분 넘게 실패하거나, 체결 기록·장 마감 기록·주간 백업이 실패하면 (단체방엔 안 보냄)')}
+      ${c.sys && !(i.telegram && i.telegram.adminChatId) ? '<p class="hint" style="margin:-4px 0 4px 26px"><span class="bad">받을 개인 대화가 지정되지 않아</span> 지금은 시스템 이상 알림을 보내지 않아요. 위 텔레그램 카드에서 지정하세요.</p>' : ''}
       <div class="actions" style="margin-top:0">
         <button class="btn primary" type="submit">저장</button>
         <button class="btn" type="button" data-act="alertCheck">지금 수익률·다음 알림 보기</button>
@@ -1593,9 +1600,12 @@ async function adminAction(act, btn) {
       const j = await run('tgFindChats');
       S.tgChats = j.chats || [];
       render();
-      show(S.tgChats.length ? '아래 목록에서 알림 받을 단체방을 고르세요.' : `찾은 방이 없어요. 봇을 단체방에 초대한 뒤 그 방에 /start@${(S.info.telegram && S.info.telegram.bot) || '봇아이디'} 를 보내고 다시 눌러주세요.`);
+      show(S.tgChats.length ? '아래 목록에서 알림 받을 단체방(이 방으로)과 시스템 알림 받을 개인 대화(시스템 알림 받기)를 고르세요.' : `찾은 방이 없어요. 봇을 단체방에 초대한 뒤 그 방에 /start@${(S.info.telegram && S.info.telegram.bot) || '봇아이디'} 를 보내고(개인 대화는 봇과 1:1 대화에서 /start) 다시 눌러주세요.`);
     }
     if (act === 'tgPick') { await run('tgSetChat', { chatId: btn.dataset.chat, title: btn.dataset.title }, '알림 받을 방을 저장했습니다.', false, true); S.tgChats = null; show('✓ ' + btn.dataset.title + ' 방으로 보내요. "테스트 메시지 보내기"로 확인하세요.'); render(); }
+    if (act === 'tgPickAdmin') { await run('tgSetAdminChat', { chatId: btn.dataset.chat, title: btn.dataset.title }, '시스템 알림 받을 사람을 저장했습니다.', false, true); S.tgChats = null; show('✓ 시스템 이상 알림은 이제 ' + btn.dataset.title + ' 개인 대화로만 가요. "시스템 알림 테스트"로 확인하세요.'); render(); }
+    if (act === 'tgAdminTest') { await run('tgAdminTest', {}, null, false, true); show('✓ 보냈어요. 봇과의 1:1 대화를 확인하세요.'); }
+    if (act === 'tgClearAdmin') { if (!confirm('시스템 알림 받을 개인 대화를 해제할까요? (해제하면 시스템 이상 알림은 보내지 않습니다)')) return; await run('tgClearAdmin', {}, '해제했습니다.', false, true); show(''); }
     if (act === 'tgTest') { await run('tgTest', {}, null, false, true); show('✓ 보냈어요. 텔레그램 단체방을 확인하세요.'); }
     if (act === 'tgDisconnect') { if (!confirm('텔레그램 알림 연결을 해제할까요? (봇 토큰도 지워집니다)')) return; await run('tgDisconnect', {}, '연결을 해제했습니다.', false, true); S.tgChats = null; show(''); }
     if (act === 'alertCheck') {
