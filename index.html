@@ -683,6 +683,7 @@ const BUSY_TEXT = {
   saveKis: '계좌 정보 저장 중…', disconnectKis: '연결 해제 중…', setAutoSync: '자동 실행 설정 중…',
   changePassword: '비밀번호 변경 중…', setMemberPassword: '부원 비밀번호 저장 중…',
   stopLossSave: '자동 손절 설정 저장 중…', stopLossCheck: '보유종목 손실률 점검 중…',
+  tgSave: '텔레그램 봇 확인 중…', tgFindChats: '단체방 찾는 중…', tgSetChat: '알림 받을 방 저장 중…', tgTest: '테스트 메시지 보내는 중…', tgDisconnect: '텔레그램 연결 해제 중…',
   kakaoSave: '카카오 설정 저장 중…', kakaoAuthUrl: '카카오 연결 준비 중…', kakaoTest: '테스트 메시지 보내는 중…', kakaoDisconnect: '카카오 연결 해제 중…',
 };
 
@@ -1247,6 +1248,7 @@ function viewAdmin() {
   </div>
   ${S.recon ? reconTable() : ''}
   ${i && i.stopLoss ? stopLossCard(i) : ''}
+  ${i && i.telegram ? telegramCard(i) : ''}
   ${i && i.kakao ? kakaoCard(i) : ''}
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>펀드 설정</h3>
@@ -1324,6 +1326,42 @@ function stopLossCard(i) {
     <div id="slResult">${flashHtml('slResult')}</div>
     <p class="hint">자동 매도는 연결된 한국투자증권 계좌(${env})에 <b>시장가 전량 매도</b> 주문을 넣습니다. 체결은 매매기록에 "변동성 대응 손절 원칙(평균단가 대비 −${sl.pct}%)에 따른 자동 매도" 사유와 함께 기록됩니다. 같은 종목은 30분 안에 다시 주문하지 않습니다.</p>
     ${ev.length ? `<div class="logbox" style="margin-top:10px;max-height:220px">${ev.map(e => `<div><span class="muted num">${esc(kstTime(e[0]))}</span><b>${esc(e[1])}</b><span>${esc(e[2])}</span></div>`).join('')}</div>` : ''}
+  </div>`;
+}
+/** 텔레그램 알림 (운영진 단체방) — 서버 Telegram.gs가 있을 때만 표시 */
+function telegramCard(i) {
+  const t = i.telegram;
+  const chats = S.tgChats;
+  const last = t.last;
+  return `<div class="card" style="margin-top:14px"><h3>텔레그램 알림 <span class="sub">운영진 단체방 · 자동 손절 주문을 모두에게</span></h3>
+    <div class="status">
+      <div class="line"><span>봇</span><span>${t.bot ? `<span class="ok">@${esc(t.bot)}</span>` : '<span class="bad">설정 안 됨</span>'}</span></div>
+      <div class="line"><span>알림 받을 방</span><span>${t.chatId ? `<span class="ok">${esc(t.chatTitle || t.chatId)}</span>` : '<span class="bad">선택 안 됨</span>'}</span></div>
+      ${last ? `<div class="line"><span>마지막 전송</span><span>${last.ok ? '<span class="ok">성공</span>' : '<span class="bad">실패</span>'} · ${kstTime(last.at)}</span></div>` : ''}
+    </div>
+    <details style="margin-top:10px"${t.chatId ? '' : ' open'}><summary style="cursor:pointer;font-weight:600">설정 방법 (처음 한 번)</summary>
+      <ol class="hint" style="margin:8px 0 0;padding-left:20px;line-height:1.9">
+        <li>텔레그램에서 <b>@BotFather</b> 검색 → 대화 시작 → <code>/newbot</code></li>
+        <li>봇 이름(예: VIM 펀드 알림)과 아이디(영문, <code>_bot</code>으로 끝남)를 입력 → 받은 <b>토큰</b>(숫자:영문)을 복사</li>
+        <li>아래 칸에 토큰을 붙여넣고 <b>저장</b></li>
+        <li>운영진 <b>단체방</b>을 만들고 봇을 멤버로 초대 (방 정보 → 멤버 추가 → 봇 아이디 검색)</li>
+        <li>단체방에 <code>/start@${esc(t.bot || '봇아이디')}</code> 를 보내고 → 아래 <b>단체방 찾기</b> → 목록에서 선택</li>
+        <li><b>테스트 메시지 보내기</b>로 모두에게 알림이 오는지 확인</li>
+      </ol>
+    </details>
+    <form class="form" id="tgForm" autocomplete="off" style="margin-top:12px">
+      <label>봇 토큰${pwInput(`name="token" autocomplete="off" placeholder="${t.tokenSet ? '저장됨 · 바꿀 때만 입력' : '123456789:AA…'}"`)}</label>
+      <label class="check"><input type="checkbox" name="notifyWatch" ${t.notifyWatch ? 'checked' : ''}> 자동 손절이 '알림만'일 때 기준에 도달한 종목도 보내기</label>
+      <div class="actions" style="margin-top:0">
+        <button class="btn primary" type="submit">저장</button>
+        ${t.tokenSet ? '<button class="btn" type="button" data-act="tgFindChats">단체방 찾기</button>' : ''}
+        ${t.chatId ? '<button class="btn" type="button" data-act="tgTest">테스트 메시지 보내기</button>' : ''}
+        ${t.tokenSet ? '<button class="btn danger" type="button" data-act="tgDisconnect">연결 해제</button>' : ''}
+      </div>
+    </form>
+    ${chats ? (chats.length ? `<div class="logbox" style="margin-top:10px;max-height:none">${chats.map(c => `<div style="grid-template-columns:1fr auto;align-items:center"><span><b>${esc(c.title)}</b> <span class="muted">${c.type === 'private' ? '개인 대화' : '단체방'}</span></span><button class="btn sm${c.id === t.chatId ? '' : ' primary'}" type="button" data-act="tgPick" data-chat="${esc(c.id)}" data-title="${esc(c.title)}">${c.id === t.chatId ? '선택됨' : '이 방으로'}</button></div>`).join('')}</div>` : '') : ''}
+    <div id="tgResult">${flashHtml('tgResult')}</div>
+    <p class="hint">봇 토큰은 Apps Script 스크립트 속성에만 저장됩니다. 방에 사람을 추가하거나 빼면 알림 받는 사람도 바로 바뀝니다.</p>
   </div>`;
 }
 /** 카카오톡 알림 (나에게 보내기) — 서버 Kakao.gs가 있을 때만 표시 */
@@ -1462,6 +1500,12 @@ function afterAdmin() {
     const f = Object.fromEntries(new FormData(e.target));
     run('saveKis', { kis: f }, 'KIS 연결 정보를 저장했습니다. "연결 테스트"로 확인하세요.', false, true);
   };
+  const tf = $('#tgForm');
+  if (tf) tf.onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(tf);
+    run('tgSave', { token: String(f.get('token') || '').trim(), notifyWatch: !!f.get('notifyWatch') }, '텔레그램 알림 설정을 저장했습니다.', false, true).catch(() => {});
+  };
   const kf = $('#kakaoForm');
   if (kf) kf.onsubmit = e => {
     e.preventDefault();
@@ -1520,7 +1564,7 @@ function flashHtml(id) {
   return t ? `<div class="result">${esc(t)}</div>` : '';
 }
 async function adminAction(act, btn) {
-  const id = ['backupNow', 'toggleLock', 'updateCompanies'].includes(act) ? 'bkResult' : act === 'stopLossCheck' ? 'slResult' : /^kakao/.test(act) ? 'kkResult' : 'actResult';
+  const id = ['backupNow', 'toggleLock', 'updateCompanies'].includes(act) ? 'bkResult' : act === 'stopLossCheck' ? 'slResult' : /^kakao/.test(act) ? 'kkResult' : /^tg/.test(act) ? 'tgResult' : 'actResult';
   // 결과를 상태에 저장해 화면을 다시 그려도 메시지가 유지되게 함
   const show = t => { S.flash = S.flash || {}; S.flash[id] = t; const o = document.getElementById(id); if (o) o.innerHTML = flashHtml(id); };
   try {
@@ -1550,6 +1594,15 @@ async function adminAction(act, btn) {
       const j = await run('rebuildHistory', {}, null, true, true);
       show('✓ ' + j.result);
     }
+    if (act === 'tgFindChats') {
+      const j = await run('tgFindChats');
+      S.tgChats = j.chats || [];
+      render();
+      show(S.tgChats.length ? '아래 목록에서 알림 받을 단체방을 고르세요.' : `찾은 방이 없어요. 봇을 단체방에 초대한 뒤 그 방에 /start@${(S.info.telegram && S.info.telegram.bot) || '봇아이디'} 를 보내고 다시 눌러주세요.`);
+    }
+    if (act === 'tgPick') { await run('tgSetChat', { chatId: btn.dataset.chat, title: btn.dataset.title }, '알림 받을 방을 저장했습니다.', false, true); S.tgChats = null; show('✓ ' + btn.dataset.title + ' 방으로 보내요. "테스트 메시지 보내기"로 확인하세요.'); render(); }
+    if (act === 'tgTest') { await run('tgTest', {}, null, false, true); show('✓ 보냈어요. 텔레그램 단체방을 확인하세요.'); }
+    if (act === 'tgDisconnect') { if (!confirm('텔레그램 알림 연결을 해제할까요? (봇 토큰도 지워집니다)')) return; await run('tgDisconnect', {}, '연결을 해제했습니다.', false, true); S.tgChats = null; show(''); }
     if (act === 'kakaoConnect') {
       const w = window.open('', '_blank'); // 클릭 직후에 열어야 팝업 차단에 안 걸림
       show('카카오 로그인 창을 여는 중…');
