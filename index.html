@@ -416,7 +416,8 @@ async function apiPost(action, payload = {}) {
   const j = await withRetry(action, async () => readJson(await fetch(CONFIG.API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify(Object.assign({ action, token: S.auth && S.auth.token }, payload)),
+    // 로그인 토큰은 마지막에 넣어 요청 내용(payload)의 같은 이름 칸이 덮어쓰지 못하게 함 (2026-11-11 텔레그램 봇 토큰이 덮어써 로그아웃되던 문제)
+    body: JSON.stringify(Object.assign({}, payload, { action, token: S.auth && S.auth.token })),
   })));
   if (!j.ok) {
     if (j.error === 'AUTH') { setAuth(null, false); throw new Error('로그인이 만료되었습니다. 다시 로그인하세요.'); }
@@ -1504,7 +1505,7 @@ function afterAdmin() {
   if (tf) tf.onsubmit = e => {
     e.preventDefault();
     const f = new FormData(tf);
-    run('tgSave', { token: String(f.get('token') || '').trim(), notifyWatch: !!f.get('notifyWatch') }, '텔레그램 알림 설정을 저장했습니다.', false, true).catch(() => {});
+    run('tgSave', { botToken: String(f.get('token') || '').trim(), notifyWatch: !!f.get('notifyWatch') }, '텔레그램 알림 설정을 저장했습니다.', false, true).catch(() => {});
   };
   const kf = $('#kakaoForm');
   if (kf) kf.onsubmit = e => {
