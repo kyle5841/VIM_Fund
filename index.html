@@ -386,7 +386,7 @@ const sd = a => { if (a.length < 2) return NaN; const m = mean(a); return Math.s
 
 /* ===================== API ===================== */
 /* 여러 번 보내도 결과가 같은 요청만 자동 재시도 (매매 입력·수정·삭제 등은 제외) */
-const SAFE_RETRY = ['public', 'companies', 'data', 'info', 'login', 'testKis', 'syncNow', 'reconcile'];
+const SAFE_RETRY = ['public', 'companies', 'data', 'info', 'login', 'testKis', 'syncNow', 'reconcile', 'stopLossCheck'];
 
 /** 응답을 JSON으로 읽고, Google이 HTML 오류 페이지를 보내면 그 제목·내용을 담은 오류로 바꿉니다. */
 async function readJson(r) {
@@ -682,6 +682,7 @@ const BUSY_TEXT = {
   recordToday: '오늘 수익률 기록 중…', backupNow: '시트 백업 중…', setSheetLock: '시트 잠금 설정 중…', updateCompanies: '상장기업 목록 갱신 중…',
   saveKis: '계좌 정보 저장 중…', disconnectKis: '연결 해제 중…', setAutoSync: '자동 실행 설정 중…',
   changePassword: '비밀번호 변경 중…', setMemberPassword: '부원 비밀번호 저장 중…',
+  stopLossSave: '자동 손절 설정 저장 중…', stopLossCheck: '보유종목 손실률 점검 중…',
 };
 
 /* ===================== 즉시 반영 =====================
@@ -1238,12 +1239,13 @@ function viewAdmin() {
           <label>투자 환경<select class="input" name="env"><option value="real" ${k.env !== 'mock' ? 'selected' : ''}>실전투자</option><option value="mock" ${k.env === 'mock' ? 'selected' : ''}>모의투자</option></select></label>
           <label>동기화 시작일<input class="input" type="date" name="syncStart" value="${esc(k.syncStart || kstDate())}"><span class="help">이 날짜 이후 체결만 매매기록에 추가 (기존 수기 기록과 중복 방지)</span></label>
         </div>
-        <p class="help" style="margin:0">🔒 키는 Apps Script 스크립트 속성에만 저장되며 웹페이지·스프레드시트에 노출되지 않습니다. 조회 권한만 사용하며 주문 기능은 없습니다.</p>
+        <p class="help" style="margin:0">🔒 키는 Apps Script 스크립트 속성에만 저장되며 웹페이지·스프레드시트에 노출되지 않습니다. 조회만 사용합니다 (예외: 아래 '변동성 대응 자동 손절'을 자동 매도로 켠 경우에만 매도 주문).</p>
         <div class="actions" style="margin-top:0"><button class="btn primary" type="submit">저장</button>${k.enabled ? '<button class="btn danger" type="button" data-act="disconnectKis">연결 해제</button>' : ''}</div>
       </form>
     </div>
   </div>
   ${S.recon ? reconTable() : ''}
+  ${i && i.stopLoss ? stopLossCard(i) : ''}
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>펀드 설정</h3>
       <form class="form" id="cfgForm">
@@ -1297,6 +1299,29 @@ function accessCard(i) {
       <div class="row"><label>현재 관리자 비밀번호${pwInput('name="old" required autocomplete="current-password"')}</label><label>새 관리자 비밀번호 (8자 이상)${pwInput('name="new" minlength="8" required autocomplete="new-password"')}</label></div>
       <div><button class="btn sm" type="submit">관리자 비밀번호 변경</button></div>
     </form>`}
+  </div>`;
+}
+/** [임시 기능] 변동성 대응 자동 손절 — 서버 StopLoss.gs가 있을 때만 표시 */
+function stopLossCard(i) {
+  const sl = i.stopLoss;
+  const env = i.kis && i.kis.env === 'mock' ? '모의투자' : '실전투자';
+  const state = sl.mode === 'on' ? '<span class="bad">자동 매도 켜짐</span>' : sl.mode === 'watch' ? '<span class="ok">알림만</span>' : '꺼짐';
+  const ev = sl.events || [];
+  const opts = [['off', '끄기'], ['watch', '알림만 (주문 없이 기록)'], ['on', '자동 매도 (시장가 전량)']];
+  return `<div class="card" style="margin-top:14px"><h3>변동성 대응 자동 손절 <span class="sub">임시 기능 · 필요 없어지면 끄기</span></h3>
+    <div class="status">
+      <div class="line"><span>현재 상태</span><span>${state}${sl.mode !== 'off' ? ` · 평균단가 대비 −${sl.pct}% 이하 · 평일 09:00~15:20, 5분마다 점검${sl.trigger ? '' : ' <span class="bad">(점검 트리거 없음 — 다시 저장하세요)</span>'}` : ''}</span></div>
+    </div>
+    <form class="form" id="slForm" style="margin-top:12px">
+      <div class="row">
+        <label>모드<select class="input" name="mode">${opts.map(([v, t]) => `<option value="${v}" ${sl.mode === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+        <label>손절 기준 (평균단가 대비 −%)<input class="input num" name="pct" inputmode="decimal" value="${sl.pct}"></label>
+      </div>
+      <div class="actions" style="margin-top:0"><button class="btn primary" type="submit">저장</button><button class="btn" type="button" data-act="stopLossCheck">지금 점검 (주문 없음)</button></div>
+    </form>
+    <div id="slResult">${flashHtml('slResult')}</div>
+    <p class="hint">자동 매도는 연결된 한국투자증권 계좌(${env})에 <b>시장가 전량 매도</b> 주문을 넣습니다. 체결은 매매기록에 "변동성 대응 손절 원칙(평균단가 대비 −${sl.pct}%)에 따른 자동 매도" 사유와 함께 기록됩니다. 같은 종목은 30분 안에 다시 주문하지 않습니다.</p>
+    ${ev.length ? `<div class="logbox" style="margin-top:10px;max-height:220px">${ev.map(e => `<div><span class="muted num">${esc(kstTime(e[0]))}</span><b>${esc(e[1])}</b><span>${esc(e[2])}</span></div>`).join('')}</div>` : ''}
   </div>`;
 }
 function backupCard(i) {
@@ -1399,6 +1424,16 @@ function afterAdmin() {
     const f = Object.fromEntries(new FormData(e.target));
     run('saveKis', { kis: f }, 'KIS 연결 정보를 저장했습니다. "연결 테스트"로 확인하세요.', false, true);
   };
+  const slf = $('#slForm');
+  if (slf) slf.onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(slf);
+    const mode = f.get('mode');
+    const p = +String(f.get('pct')).replace(/[^\d.]/g, '');
+    if (!(p >= 1 && p <= 30)) { toast('손절 기준은 1~30% 사이로 입력하세요.', true); return; }
+    if (mode === 'on' && !confirm(`보유종목이 평균단가 대비 −${p}% 이하로 떨어지면\n한국투자증권 계좌에서 시장가로 전량 매도 주문을 자동으로 넣습니다.\n(평일 09:00~15:20, 5분마다 점검)\n\n자동 매도를 켤까요?`)) return;
+    run('stopLossSave', { mode, pct: p }, mode === 'off' ? '자동 손절을 껐습니다.' : '자동 손절 설정을 저장했습니다.', false, true).catch(() => {});
+  };
   const pw = $('#pwForm');
   if (pw) pw.onsubmit = e => {
     e.preventDefault();
@@ -1440,7 +1475,7 @@ function flashHtml(id) {
   return t ? `<div class="result">${esc(t)}</div>` : '';
 }
 async function adminAction(act, btn) {
-  const id = ['backupNow', 'toggleLock', 'updateCompanies'].includes(act) ? 'bkResult' : 'actResult';
+  const id = ['backupNow', 'toggleLock', 'updateCompanies'].includes(act) ? 'bkResult' : act === 'stopLossCheck' ? 'slResult' : 'actResult';
   // 결과를 상태에 저장해 화면을 다시 그려도 메시지가 유지되게 함
   const show = t => { S.flash = S.flash || {}; S.flash[id] = t; const o = document.getElementById(id); if (o) o.innerHTML = flashHtml(id); };
   try {
@@ -1469,6 +1504,11 @@ async function adminAction(act, btn) {
       show('재구성 중… (1~2분 걸릴 수 있습니다)');
       const j = await run('rebuildHistory', {}, null, true, true);
       show('✓ ' + j.result);
+    }
+    if (act === 'stopLossCheck') {
+      show('보유종목 손실률 점검 중…');
+      const r = (await run('stopLossCheck')).result || [];
+      show(r.length ? `기준 이하 ${r.length}종목 (주문은 넣지 않았습니다)\n` + r.map(x => `${x.name} ${pct(x.rate, 1)} · 평균단가 ${won(x.avg)} → 현재가 ${won(x.price)} · 매도 가능 ${qtyf(x.sellable)}주`).join('\n') : '✓ 기준 이하로 떨어진 종목이 없습니다.');
     }
     if (act === 'disconnectKis') { if (!confirm('KIS 연결 정보를 삭제할까요? (매매기록은 유지됩니다)')) return; await run('disconnectKis', {}, '연결을 해제했습니다.', true, true); }
   } catch (e) { show('✕ ' + e.message); }
