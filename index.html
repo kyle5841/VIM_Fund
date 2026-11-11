@@ -684,6 +684,7 @@ const BUSY_TEXT = {
   saveKis: '계좌 정보 저장 중…', disconnectKis: '연결 해제 중…', setAutoSync: '자동 실행 설정 중…',
   changePassword: '비밀번호 변경 중…', setMemberPassword: '부원 비밀번호 저장 중…',
   stopLossSave: '자동 손절 설정 저장 중…', stopLossCheck: '보유종목 손실률 점검 중…',
+  alertSave: '알림 설정 저장 중…', alertCheck: '보유종목 수익률 확인 중…', alertDailyTest: '리포트 보내는 중…',
   tgSave: '텔레그램 봇 확인 중…', tgFindChats: '단체방 찾는 중…', tgSetChat: '알림 받을 방 저장 중…', tgTest: '테스트 메시지 보내는 중…', tgDisconnect: '텔레그램 연결 해제 중…',
 };
 
@@ -1249,6 +1250,7 @@ function viewAdmin() {
   ${S.recon ? reconTable() : ''}
   ${i && i.stopLoss ? stopLossCard(i) : ''}
   ${i && i.telegram ? telegramCard(i) : ''}
+  ${i && i.alerts ? alertsCard(i) : ''}
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>펀드 설정</h3>
       <form class="form" id="cfgForm">
@@ -1332,7 +1334,7 @@ function telegramCard(i) {
   const t = i.telegram;
   const chats = S.tgChats;
   const last = t.last;
-  return `<div class="card" style="margin-top:14px"><h3>텔레그램 알림 <span class="sub">운영진 단체방 · 자동 손절 주문을 모두에게</span></h3>
+  return `<div class="card" style="margin-top:14px"><h3>텔레그램 알림 <span class="sub">운영진 단체방 · 펀드 알림을 모두에게</span></h3>
     <div class="status">
       <div class="line"><span>봇</span><span>${t.bot ? `<span class="ok">@${esc(t.bot)}</span>` : '<span class="bad">설정 안 됨</span>'}</span></div>
       <div class="line"><span>알림 받을 방</span><span>${t.chatId ? `<span class="ok">${esc(t.chatTitle || t.chatId)}</span>` : '<span class="bad">선택 안 됨</span>'}</span></div>
@@ -1361,6 +1363,33 @@ function telegramCard(i) {
     ${chats ? (chats.length ? `<div class="logbox" style="margin-top:10px;max-height:none">${chats.map(c => `<div style="grid-template-columns:1fr auto;align-items:center"><span><b>${esc(c.title)}</b> <span class="muted">${c.type === 'private' ? '개인 대화' : '단체방'}</span></span><button class="btn sm${c.id === t.chatId ? '' : ' primary'}" type="button" data-act="tgPick" data-chat="${esc(c.id)}" data-title="${esc(c.title)}">${c.id === t.chatId ? '선택됨' : '이 방으로'}</button></div>`).join('')}</div>` : '') : ''}
     <div id="tgResult">${flashHtml('tgResult')}</div>
     <p class="hint">봇 토큰은 Apps Script 스크립트 속성에만 저장됩니다. 방에 사람을 추가하거나 빼면 알림 받는 사람도 바로 바뀝니다.</p>
+  </div>`;
+}
+/** 알림 종류 (텔레그램으로 보낼 알림) — 서버 Alerts.gs가 있을 때만 표시 */
+function alertsCard(i) {
+  const a = i.alerts, c = a.cfg || {};
+  const tgReady = i.telegram && i.telegram.chatId;
+  const ev = a.events || [];
+  const box = (name, title, desc) => `<label class="check" style="align-items:flex-start!important"><input type="checkbox" name="${name}" ${c[name] ? 'checked' : ''} style="margin-top:3px"><span><b>${title}</b><br><span class="muted">${desc}</span></span></label>`;
+  return `<div class="card" style="margin-top:14px"><h3>알림 종류 <span class="sub">텔레그램 단체방으로 보낼 알림</span></h3>
+    ${tgReady ? '' : '<p class="hint"><span class="bad">텔레그램 단체방이 연결돼야 알림이 갑니다.</span> 위 텔레그램 알림 카드에서 먼저 설정하세요.</p>'}
+    ${i.autoSync ? '' : '<p class="hint"><span class="bad">자동 실행이 꺼져 있어</span> 수익률·체결 알림을 확인하지 않습니다. KIS 카드에서 "자동 실행 켜기"를 누르세요.</p>'}
+    <form class="form" id="alForm" style="margin-top:8px">
+      ${box('pnlUp', '📈 수익 알림', `보유종목이 평균단가 대비 +${c.step}%, +${c.step * 2}%… 를 넘을 때마다`)}
+      ${box('pnlDown', '📉 손실 알림', `−${c.step}%, −${c.step * 2}%… 를 넘을 때마다 (자동 손절을 꺼도 계속 알림)`)}
+      <div class="row"><label>수익·손실 알림 단위 (%)<input class="input num" name="step" inputmode="decimal" value="${c.step}"></label></div>
+      ${box('fill', '🔔 체결 알림', '계좌에서 매수·매도가 체결되면 (매도는 실현손익 포함)')}
+      ${box('daily', '📊 장 마감 리포트', '평일 16시경 기준가 · KOSPI 대비 · AUM · 오늘 체결 · 수익/손실 상위 종목')}
+      ${box('sys', '⚠️ 시스템 이상', '자동 동기화가 30분 넘게 실패하거나, 체결 기록·장 마감 기록·주간 백업이 실패하면')}
+      <div class="actions" style="margin-top:0">
+        <button class="btn primary" type="submit">저장</button>
+        <button class="btn" type="button" data-act="alertCheck">지금 수익률·다음 알림 보기</button>
+        ${tgReady ? '<button class="btn" type="button" data-act="alertDailyTest">장 마감 리포트 미리 보내기</button>' : ''}
+      </div>
+    </form>
+    <div id="alResult">${flashHtml('alResult')}</div>
+    <p class="hint">수익률·체결 알림은 자동 동기화(평일 08~19시, 10분마다) 때 확인합니다. 처음 보는 종목이나 추가 매수로 평균단가가 바뀐 종목은 그때 수준을 기준으로 잡고 다음 단계부터 알려요. 같은 단계는 한 단계(${c.step}%p) 이상 되돌아갔다가 다시 넘으면 다시 알려요.</p>
+    ${ev.length ? `<div class="logbox" style="margin-top:10px;max-height:220px">${ev.map(e => `<div><span class="muted num">${esc(kstTime(e[0]))}</span><b>${esc(e[1])}</b><span>${esc(e[2])}${e[3] ? '' : ' <span class="bad">(전송 안 됨)</span>'}</span></div>`).join('')}</div>` : ''}
   </div>`;
 }
 function backupCard(i) {
@@ -1469,6 +1498,16 @@ function afterAdmin() {
     const f = new FormData(tf);
     run('tgSave', { botToken: String(f.get('token') || '').trim(), notifyWatch: !!f.get('notifyWatch') }, '텔레그램 알림 설정을 저장했습니다.', false, true).catch(() => {});
   };
+  const alf = $('#alForm');
+  if (alf) alf.onsubmit = e => {
+    e.preventDefault();
+    const f = new FormData(alf);
+    const step = +String(f.get('step')).replace(/[^\d.]/g, '');
+    if (!(step >= 1 && step <= 50)) { toast('수익률 알림 단위는 1~50% 사이로 입력하세요.', true); return; }
+    const alerts = { step };
+    ['pnlUp', 'pnlDown', 'fill', 'daily', 'sys'].forEach(k => { alerts[k] = !!f.get(k); });
+    run('alertSave', { alerts }, '알림 설정을 저장했습니다.', false, true).catch(() => {});
+  };
   const slf = $('#slForm');
   if (slf) slf.onsubmit = e => {
     e.preventDefault();
@@ -1520,7 +1559,7 @@ function flashHtml(id) {
   return t ? `<div class="result">${esc(t)}</div>` : '';
 }
 async function adminAction(act, btn) {
-  const id = ['backupNow', 'toggleLock', 'updateCompanies'].includes(act) ? 'bkResult' : act === 'stopLossCheck' ? 'slResult' : /^tg/.test(act) ? 'tgResult' : 'actResult';
+  const id = ['backupNow', 'toggleLock', 'updateCompanies'].includes(act) ? 'bkResult' : act === 'stopLossCheck' ? 'slResult' : /^tg/.test(act) ? 'tgResult' : /^alert/.test(act) ? 'alResult' : 'actResult';
   // 결과를 상태에 저장해 화면을 다시 그려도 메시지가 유지되게 함
   const show = t => { S.flash = S.flash || {}; S.flash[id] = t; const o = document.getElementById(id); if (o) o.innerHTML = flashHtml(id); };
   try {
@@ -1559,6 +1598,12 @@ async function adminAction(act, btn) {
     if (act === 'tgPick') { await run('tgSetChat', { chatId: btn.dataset.chat, title: btn.dataset.title }, '알림 받을 방을 저장했습니다.', false, true); S.tgChats = null; show('✓ ' + btn.dataset.title + ' 방으로 보내요. "테스트 메시지 보내기"로 확인하세요.'); render(); }
     if (act === 'tgTest') { await run('tgTest', {}, null, false, true); show('✓ 보냈어요. 텔레그램 단체방을 확인하세요.'); }
     if (act === 'tgDisconnect') { if (!confirm('텔레그램 알림 연결을 해제할까요? (봇 토큰도 지워집니다)')) return; await run('tgDisconnect', {}, '연결을 해제했습니다.', false, true); S.tgChats = null; show(''); }
+    if (act === 'alertCheck') {
+      show('보유종목 수익률 확인 중…');
+      const r = (await run('alertCheck')).result || [];
+      show(r.length ? '종목 · 지금 수익률 · 다음 알림 (수익 / 손실)\n' + r.map(x => `${x.name} ${pct(x.rate, 1)} · +${x.nextUp}% / ${x.nextDown}%`).join('\n') : '보유종목이 없어요.');
+    }
+    if (act === 'alertDailyTest') { await run('alertDailyTest', {}, null, false, true); show('✓ 최근 장 마감 리포트를 단체방으로 보냈어요.'); }
     if (act === 'stopLossCheck') {
       show('보유종목 손실률 점검 중…');
       const r = (await run('stopLossCheck')).result || [];
